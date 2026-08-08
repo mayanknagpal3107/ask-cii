@@ -18,17 +18,17 @@
     {
       "title": "Become a member",
       "subtitle": "Membership in 4 steps",
-      "question": "How do I become a CII member?"
+      "url": "https://www.cii.in/how_to_become_a_member.aspx?gid=M"
     },
     {
       "title": "Find a regional office",
       "subtitle": "Offices across India",
-      "question": "Where is the nearest CII regional office?"
+      "url": "https://www.cii.in/Contact_Us.aspx?gid=C"
     },
     {
       "title": "Media contact",
       "subtitle": "For press & journalists",
-      "question": "How do I contact CII for media and press queries?"
+      "url": "https://www.cii.in/NewsRoom.aspx?gid=N"
     }
   ]
 }

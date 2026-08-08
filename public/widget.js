@@ -295,9 +295,11 @@
         btn.innerHTML = `${I.speaker} <span>Listen to this answer</span>`;
         btn.disabled = false;
       };
-      await audioEl.play();
+      // Flip the button before play() — on some devices/policies the promise
+      // settles late or rejects, and the label must never stick on "Preparing".
       btn.disabled = false;
       btn.innerHTML = `${I.pause} <span>Stop audio</span>`;
+      await audioEl.play();
     } catch {
       btn.disabled = false;
       btn.innerHTML = `${I.speaker} <span>Listen to this answer</span>`;
