@@ -388,7 +388,10 @@ function retrievalOnlyAnswer(store, q) {
       actions: [], sources: [], confidence: 'low', fallback: true,
     });
   }
-  const first = index.chunks[top[0]].t.split('\n').slice(1).join(' ');
+  // Chunk text is "title\nbody" — prefer the body, but title-only chunks
+  // (page head entries) have no second line.
+  const topChunk = index.chunks[top[0]].t;
+  const first = topChunk.split('\n').slice(1).join(' ').trim() || topChunk;
   return json({
     summary: `${first.slice(0, 260)}…`,
     lang: 'en', langName: 'English',
