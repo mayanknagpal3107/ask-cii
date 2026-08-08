@@ -68,7 +68,11 @@
           <button class="acii-iconbtn acii-mic" title="Ask by voice" aria-label="Ask by voice">${I.mic}</button>
           <button class="acii-iconbtn acii-close" title="Close" aria-label="Close">${I.x}</button>
         </div>
-        <div class="acii-body"></div>
+        <div class="acii-body">
+          <div class="acii-skel" style="width:38%;margin-top:26px"></div>
+          <div class="acii-skel" style="width:88%"></div>
+          <div class="acii-skel" style="width:70%"></div>
+        </div>
         <div class="acii-foot">
           <span class="acii-keys"><span>${I.enter} <b>open</b></span><span><b>esc</b> close</span></span>
           <span>CII intelligent search</span>

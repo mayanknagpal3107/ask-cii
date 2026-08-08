@@ -86,7 +86,8 @@ await page.keyboard.press('Control+KeyK');
 await page.waitForSelector('.acii-overlay.acii-open', { timeout: 5000 });
 ok('Ctrl+K opens popup', true);
 
-/* 3. home view */
+/* 3. home view (chips render once /api/suggestions resolves) */
+await page.waitForSelector('.acii-chip', { timeout: 15000 });
 ok('try-asking chips', await page.locator('.acii-chip').count() >= 4);
 ok('common questions (3 shown)', await page.locator('.acii-qrow').count() === 3);
 await page.click('.acii-more');
