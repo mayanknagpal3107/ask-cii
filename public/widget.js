@@ -40,6 +40,7 @@
   let audioEl = null;
   let recorder = null;
   let recChunks = [];
+  let recCancelled = false;
   let busy = false;
 
   const $ = (sel, root) => (root || overlay).querySelector(sel);
@@ -249,7 +250,9 @@
       stream.getTracks().forEach((t) => t.stop());
       const blob = new Blob(recChunks, { type: recorder.mimeType || 'audio/webm' });
       recorder = null;
-      if (blob.size < 2000) return; // too short to be speech
+      input.placeholder = suggestions?.placeholder || 'Ask CII anything — or search sectors, reports, offices, people...';
+      if (recCancelled) { recCancelled = false; return; }
+      if (blob.size < 2000) { renderHome(); return; } // too short to be speech
       renderThinking('', 'Transcribing your question…');
       try {
         const form = new FormData();
@@ -319,7 +322,7 @@
   function close() {
     if (!overlay) return;
     stopAudio();
-    if (recorder?.state === 'recording') recorder.stop();
+    if (recorder?.state === 'recording') { recCancelled = true; recorder.stop(); }
     overlay.classList.remove('acii-open');
     setTimeout(() => { if (overlay) overlay.style.display = 'none'; }, 180);
   }

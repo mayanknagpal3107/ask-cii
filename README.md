@@ -143,3 +143,7 @@ disable, `CHROMIUM_PATH=/path/to/chrome` to pick a system browser.
   out of the box; re-scrape any time for fresh content.
 - If no `OPENAI_API_KEY` is configured, `/api/ask` degrades to retrieval-only
   answers (BM25 + extractive snippet, English) instead of failing.
+- The Worker parses the search index once per isolate (a few MB of JSON).
+  That comfortably fits the Workers **Paid/Standard** CPU limits; on the Free
+  plan the very first request per isolate may exceed the 10 ms CPU budget on
+  large crawls — if you must stay on Free, reduce the crawl size (`--max 150`).

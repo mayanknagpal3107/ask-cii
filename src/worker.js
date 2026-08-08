@@ -59,7 +59,13 @@ async function loadIndex(env, origin) {
   let vectors = null;
   if (index.embeddings?.file) {
     const vRes = await env.ASSETS.fetch(new Request(new URL(`/data/${index.embeddings.file}`, origin)));
-    if (vRes.ok) vectors = parseVectors(await vRes.arrayBuffer());
+    if (vRes.ok) {
+      vectors = parseVectors(await vRes.arrayBuffer());
+      if (vectors.count !== index.chunks.length) {
+        console.warn(`vectors.bin has ${vectors.count} vectors but index has ${index.chunks.length} chunks — rebuild the index; using BM25 only.`);
+        vectors = null;
+      }
+    }
   }
   indexCache = { index, bm25, vectors };
   return indexCache;
@@ -163,8 +169,9 @@ async function retrieve(env, store, question, englishQuery) {
     try {
       const qVec = await embedQuery(env, englishQuery || question);
       const semantic = vectorScores(vectors, qVec);
-      const maxLex = Math.max(...lexical, 1e-6);
-      const maxSem = Math.max(...semantic, 1e-6);
+      const maxOf = (arr) => { let m = 1e-6; for (const x of arr) if (x > m) m = x; return m; };
+      const maxLex = maxOf(lexical);
+      const maxSem = maxOf(semantic);
       combined = new Float32Array(lexical.length);
       for (let i = 0; i < combined.length; i++) {
         combined[i] = 0.45 * (lexical[i] / maxLex) + 0.55 * Math.max(semantic[i] / maxSem, 0);
@@ -232,6 +239,7 @@ async function handleAsk(request, env) {
 
   // Step 1 — detect language and produce an English search query. The corpus
   // is English, so Hindi/Hinglish/Punjabi questions are translated for search.
+  // On any failure fall back to searching the raw question in English.
   const analysis = await chatJSON(env, [
     {
       role: 'system',
@@ -243,7 +251,7 @@ async function handleAsk(request, env) {
         '"englishQuery" is the question translated to English and expanded into a keyword-rich search query for the CII website (include synonyms like membership, events, publications, offices where relevant).',
     },
     { role: 'user', content: q },
-  ], 220);
+  ], 220).catch(() => ({ lang: 'en', langName: 'English', englishQuery: q }));
 
   let lang = analysis.lang || 'en';
   let langName = analysis.langName || 'English';
@@ -293,7 +301,14 @@ async function handleAsk(request, env) {
         'Return strict JSON: {"summary": string, "link": {"label": string, "url": string}, "actions": [{"label","url"}], "sources": [int], "confidence": string}',
     },
     { role: 'user', content: `Question (${langName}): ${q}\n\nContext:\n${contextBlock}` },
-  ], 700);
+  ], 700).catch(() => ({
+    // Extractive fallback keeps the widget alive if the answer call fails.
+    summary: contexts[0].texts[0].split('\n').slice(1).join(' ').slice(0, 300),
+    link: { label: 'Open page', url: contexts[0].page.url },
+    actions: [],
+    sources: [1],
+    confidence: 'low',
+  }));
 
   // Server-side grounding: only URLs that exist in the retrieved context (or
   // the site root) may be returned.
