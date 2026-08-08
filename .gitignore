@@ -5,3 +5,5 @@ node_modules/
 .DS_Store
 data/raw/
 data/*.log
+tests/fixtures/
+public/question.wav

@@ -9,6 +9,7 @@
     "deploy": "wrangler deploy",
     "scrape": "node scripts/scrape.mjs",
     "build-index": "node scripts/build-index.mjs",
+    "test:e2e": "node tests/e2e.mjs",
     "tail": "wrangler tail"
   },
   "devDependencies": {
