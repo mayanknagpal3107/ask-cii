@@ -1,0 +1,34 @@
+{
+  "placeholder": "Ask CII anything — or search sectors, reports, offices, people...",
+  "tryAsking": [
+    "How do I become a member?",
+    "Renewable energy sector",
+    "CII office in Tamil Nadu",
+    "Latest economy report"
+  ],
+  "commonQuestions": [
+    "How can I become a CII member?",
+    "What are the upcoming CII events?",
+    "How do I register for a CII conference?",
+    "Where are CII's regional offices?",
+    "What does CII do for MSMEs?",
+    "How can I access CII publications and reports?"
+  ],
+  "quickActions": [
+    {
+      "title": "Become a member",
+      "subtitle": "Membership in 4 steps",
+      "question": "How do I become a CII member?"
+    },
+    {
+      "title": "Find a regional office",
+      "subtitle": "Offices across India",
+      "question": "Where is the nearest CII regional office?"
+    },
+    {
+      "title": "Media contact",
+      "subtitle": "For press & journalists",
+      "question": "How do I contact CII for media and press queries?"
+    }
+  ]
+}

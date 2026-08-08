@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ask-cii",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-08-01",
+  "assets": {
+    "directory": "public",
+    "binding": "ASSETS"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    // Models are overridable per-environment; the OPENAI_API_KEY secret is set
+    // with `wrangler secret put OPENAI_API_KEY` (locally: .dev.vars).
+    "OPENAI_CHAT_MODEL": "gpt-4.1-mini",
+    "OPENAI_STT_MODEL": "gpt-4o-transcribe",
+    "OPENAI_TTS_MODEL": "gpt-4o-mini-tts",
+    "OPENAI_TTS_VOICE": "coral",
+    "OPENAI_EMBED_MODEL": "text-embedding-3-small",
+    "OPENAI_EMBED_DIMS": "256"
+  }
+}

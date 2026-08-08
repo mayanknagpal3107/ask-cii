@@ -1,0 +1,18 @@
+{
+  "name": "ask-cii",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ask CII — text + voice AI assistant for cii.in, built for Cloudflare Workers",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "scrape": "node scripts/scrape.mjs",
+    "build-index": "node scripts/build-index.mjs",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0",
+    "wrangler": "^4.0.0"
+  }
+}
