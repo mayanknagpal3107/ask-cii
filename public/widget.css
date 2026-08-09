@@ -471,6 +471,34 @@
 .acii-item-go svg { width: 15px; height: 15px; }
 .acii-item:hover .acii-item-go { background: #1e3fae; color: #fff; }
 
+/* tappable contact links inside answers */
+.acii-link {
+  color: #1e3fae;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: #c3cff2;
+  text-underline-offset: 3px;
+  border-radius: 4px;
+}
+.acii-link:hover { background: #eef2fe; text-decoration-color: #1e3fae; }
+.acii-map {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 12px 0 0;
+  border: 1px solid #dbe3fb;
+  background: #f7f9ff;
+  color: #1e3fae;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 7px 14px;
+  text-decoration: none;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+.acii-map:hover { background: #eef2fe; transform: translateY(-1px); }
+.acii-map svg { width: 14px; height: 14px; }
+
 .acii-english { margin-top: 14px; }
 .acii-entoggle {
   display: inline-flex;

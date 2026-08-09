@@ -150,6 +150,15 @@ await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-pathway.png` });
 await page.click('.acii-back');
 
+/* 6c. contact details are clickable */
+await page.fill('.acii-input', 'How do I reach out to CII headquarters?');
+await page.press('.acii-input', 'Enter');
+await page.waitForSelector('.acii-summary', { timeout: 90000 });
+await page.waitForTimeout(2500);
+const contactLinks = await page.$$eval('.acii-summary a.acii-link', (as) => as.map((a) => a.href));
+ok('contact details are tappable (tel:/mailto:)', contactLinks.some((h) => h.startsWith('tel:') || h.startsWith('mailto:')), contactLinks.join(' | ').slice(0, 90));
+await page.click('.acii-back');
+
 /* 7. Hindi */
 await page.fill('.acii-input', 'CII की सदस्यता कैसे लें?');
 await page.press('.acii-input', 'Enter');

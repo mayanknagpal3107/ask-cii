@@ -291,10 +291,11 @@ async function handleAsk(request, env, ctx) {
       role: 'system',
       content:
         'You analyze a user question addressed to the website assistant of CII (Confederation of Indian Industry, cii.in). ' +
-        'Return strict JSON: {"lang": string, "langName": string, "englishQuery": string}. ' +
+        'Return strict JSON: {"lang": string, "langName": string, "englishQuery": string, "queries": string[]}. ' +
         '"lang" is a short code: "en" (English), "hi" (Hindi in Devanagari), "hi-Latn" (Hinglish — Hindi/mixed written in Latin script), "pa" (Punjabi in Gurmukhi), "pa-Latn" (Punjabi in Latin script), or another BCP-47 code. ' +
         '"langName" is a human name like "English", "Hindi", "Hinglish (Hindi in Latin script)", "Punjabi". ' +
-        '"englishQuery" is the question translated to English and expanded into a keyword-rich search query for the CII website (include synonyms like membership, events, publications, offices where relevant).',
+        '"englishQuery" is the question translated to English and expanded into a keyword-rich search query for the CII website (include synonyms like membership, events, publications, offices where relevant). ' +
+        '"queries": if the user asked MULTIPLE distinct questions in one message, one English search query per question (max 3); otherwise a single-element array equal to englishQuery.',
     },
     { role: 'user', content: q },
   ], 220).catch(() => ({ lang: 'en', langName: 'English', englishQuery: q }));
@@ -313,7 +314,26 @@ async function handleAsk(request, env, ctx) {
     lang = 'pa-Latn';
     langName = 'Punjabi written in Latin script (reply ONLY in Latin letters, never Gurmukhi)';
   }
-  const contexts = await retrieve(env, store, q, analysis.englishQuery);
+  const queries = (Array.isArray(analysis.queries) && analysis.queries.length
+    ? analysis.queries : [analysis.englishQuery || q]).slice(0, 3);
+  let contexts;
+  if (queries.length === 1) {
+    contexts = await retrieve(env, store, q, queries[0]);
+  } else {
+    // Multiple questions in one message: retrieve for each and interleave so
+    // every question has supporting context.
+    const per = await Promise.all(queries.map((sub) => retrieve(env, store, sub, sub)));
+    const seen = new Set();
+    contexts = [];
+    for (let i = 0; contexts.length < 8; i++) {
+      let added = false;
+      for (const list of per) {
+        const c = list[i];
+        if (c && !seen.has(c.page.id) && contexts.length < 8) { seen.add(c.page.id); contexts.push(c); added = true; }
+      }
+      if (!added) break;
+    }
+  }
 
   if (!contexts.length) {
     return json({
@@ -337,7 +357,7 @@ async function handleAsk(request, env, ctx) {
       content:
         'You are "Ask CII", the assistant for the Confederation of Indian Industry website (cii.in). Your goal is to GUIDE the visitor: every answer must lead with the most useful ACTION they can take next.\n' +
         'Rules:\n' +
-        `1. Answer ONLY from the numbered context blocks. If they do not contain the answer, say so honestly and point to the closest relevant page.\n` +
+        `1. Answer ONLY from the numbered context blocks. If they do not contain the answer, say so honestly and point to the closest relevant page. If the user asked MULTIPLE questions, answer EVERY one of them — one short part per question (the summary may then run to 2 sentences per question).\n` +
         `2. Write the summary in ${langName} — the same language and script the user asked in. For Hinglish, write Hindi in Latin script. Never switch to another language.\n` +
         '3. Keep the summary SHORT: 1–3 sentences, factual. No markdown. Never mention the word "context" or context numbers — cite nothing inline; sources are listed separately. If you fill "items", the summary is exactly ONE sentence introducing the list and MUST NOT name any of the items (they render as cards below it).\n' +
         '4. "summaryEn": the same summary translated to natural English — REQUIRED whenever the answer language is not English; exactly null when the summary is already English.\n' +
@@ -345,11 +365,12 @@ async function handleAsk(request, env, ctx) {
         '6. "link": the single best next action. Its "label" MUST be verb-first in the user\'s language (e.g. "Register for FOODPRO 2026", "Download the Annual Report", "Apply for membership") — never a bare page name. URL from the context.\n' +
         '7. "actions": up to 1 additional {label, url} button, also verb-first. URL from the context.\n' +
         '8. "sources": array of context numbers (integers) you actually used, most relevant first, max 3.\n' +
-        '9. "confidence": "high" | "medium" | "low" — how well the context answers the question.\n' +
-        'Return strict JSON: {"summary": string, "summaryEn": string|null, "items": [{"title","detail","url"}], "link": {"label": string, "url": string}, "actions": [{"label","url"}], "sources": [int], "confidence": string}',
+        '9. "place": when the answer points to a physical venue/office/address, that place as a short "Name, City" string (e.g. "Chennai Trade Centre, Chennai" or "CII HQ, New Delhi"); else null.\n' +
+        '10. "confidence": "high" | "medium" | "low" — how well the context answers the question.\n' +
+        'Return strict JSON: {"summary": string, "summaryEn": string|null, "items": [{"title","detail","url"}], "link": {"label": string, "url": string}, "actions": [{"label","url"}], "sources": [int], "place": string|null, "confidence": string}',
     },
     { role: 'user', content: `Question (${langName}): ${q}\n\nContext:\n${contextBlock}` },
-  ], 950).catch(() => ({
+  ], 1100).catch(() => ({
     // Extractive fallback keeps the widget alive if the answer call fails.
     summary: contexts[0].texts[0].split('\n').slice(1).join(' ').slice(0, 300),
     link: { label: 'Open page', url: contexts[0].page.url },
@@ -416,6 +437,7 @@ async function handleAsk(request, env, ctx) {
     summary,
     summaryEn,
     items,
+    place: answer.place && String(answer.place).trim() ? String(answer.place).slice(0, 120) : null,
     lang,
     langName,
     link: {

@@ -239,6 +239,12 @@
         <span class="acii-badge ${pathway ? 'acii-badge-path' : ''}">${I.spark} ${pathway ? 'Your personalised pathway · based on your profile' : 'AI-generated · verify sources'}</span>
       </div>
       <p class="acii-summary">${revealWords(data.summary || '')}</p>
+      ${data.place ? `
+        <a class="acii-map acii-stagger" style="${after(0)}" target="_blank" rel="noopener"
+           href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.place)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1116 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          ${esc(data.place)} — open in Maps
+        </a>` : ''}
       ${(data.items || []).length ? `
         <div class="acii-items acii-stagger" style="${after(0)}">
           ${data.items.map((it) => `
@@ -254,7 +260,7 @@
       ${data.summaryEn && data.lang !== 'en' ? `
         <div class="acii-english acii-stagger" style="${after(2)}">
           <button class="acii-entoggle" aria-expanded="false">In English ${I.down}</button>
-          <p class="acii-entext" hidden>${esc(data.summaryEn)}</p>
+          <p class="acii-entext" hidden>${linkify(data.summaryEn)}</p>
         </div>` : ''}
       ${buttons.length ? `
         <div class="acii-actions acii-stagger" style="${after(3)}">
@@ -666,13 +672,52 @@
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
-  /** Split text into per-word spans so it streams in like ChatGPT/Claude. */
+  // Emails, URLs (incl. LinkedIn) and phone numbers become tappable links.
+  const CONTACT_RE = /([\w.+-]+@[\w-]+\.[\w.]+)|((?:https?:\/\/|www\.)[^\s,)"'<>]+)|(\+?\d[\d\s().-]{8,}\d)/g;
+
+  function hrefFor(match) {
+    if (match.includes('@') && !match.startsWith('http')) return `mailto:${match}`;
+    if (/^(https?:\/\/|www\.)/i.test(match)) return match.startsWith('www.') ? `https://${match}` : match;
+    const digits = match.replace(/[^\d+]/g, '');
+    return digits.length >= 10 ? `tel:${digits}` : null;
+  }
+
+  /** Stream text in word by word (ChatGPT-style), linkifying contacts. */
   function revealWords(text) {
-    return String(text).split(/(\s+)/).map((part, i) => {
-      if (!part.trim()) return part;
-      const n = Math.min(Math.floor(i / 2), 70);
-      return `<span class="acii-w" style="--w:${n}">${esc(part)}</span>`;
-    }).join('');
+    let w = 0;
+    const span = (part) => `<span class="acii-w" style="--w:${Math.min(w++, 70)}">${esc(part)}</span>`;
+    const out = [];
+    let last = 0;
+    const s = String(text);
+    for (const m of s.matchAll(CONTACT_RE)) {
+      const before = s.slice(last, m.index);
+      out.push(before.split(/(\s+)/).map((p) => (p.trim() ? span(p) : p)).join(''));
+      const clean = m[0].replace(/[.,;:]+$/, ''); // don't swallow sentence punctuation
+      const trailer = m[0].slice(clean.length);
+      const href = hrefFor(clean);
+      out.push(href
+        ? `<a class="acii-link acii-w" style="--w:${Math.min(w++, 70)}" href="${esc(href)}" target="_blank" rel="noopener">${esc(clean)}</a>${esc(trailer)}`
+        : span(clean) + esc(trailer));
+      last = m.index + m[0].length;
+    }
+    const rest = s.slice(last);
+    out.push(rest.split(/(\s+)/).map((p) => (p.trim() ? span(p) : p)).join(''));
+    return out.join('');
+  }
+
+  /** Plain linkify (no reveal) for secondary text like the English version. */
+  function linkify(text) {
+    let outp = '';
+    let last = 0;
+    const s = String(text);
+    for (const m of s.matchAll(CONTACT_RE)) {
+      outp += esc(s.slice(last, m.index));
+      const clean = m[0].replace(/[.,;:]+$/, '');
+      const href = hrefFor(clean);
+      outp += (href ? `<a class="acii-link" href="${esc(href)}" target="_blank" rel="noopener">${esc(clean)}</a>` : esc(clean)) + esc(m[0].slice(clean.length));
+      last = m.index + m[0].length;
+    }
+    return outp + esc(s.slice(last));
   }
   function hostOf(u) {
     try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; }
