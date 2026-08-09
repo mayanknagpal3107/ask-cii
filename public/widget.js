@@ -55,6 +55,17 @@
   let recCancelled = false;
   let busy = false;
   let profile = {}; // guided-flow selections
+  const HIST_KEY = 'acii_history';
+  const history = {
+    all: () => { try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch { return []; } },
+    add: (q) => {
+      try {
+        const list = [q, ...history.all().filter((x) => x !== q)].slice(0, 10);
+        localStorage.setItem(HIST_KEY, JSON.stringify(list));
+      } catch { /* private mode */ }
+    },
+    clear: () => { try { localStorage.removeItem(HIST_KEY); } catch {} },
+  };
 
   const $ = (sel, root) => (root || overlay).querySelector(sel);
 
@@ -155,6 +166,12 @@
           </span>
           ${I.chev}
         </button>` : ''}
+      ${history.all().length ? `
+        <div class="acii-label" style="display:flex;justify-content:space-between;align-items:center">Your recent questions
+          <button class="acii-histclear">Clear</button></div>
+        <div>
+          ${history.all().slice(0, 3).map((t) => `<button class="acii-qrow acii-recent"><span>${esc(t)}</span>${I.chev}</button>`).join('')}
+        </div>` : ''}
       ${qs.length ? `
         <div class="acii-label">Ask anything</div>
         <div class="acii-qlist">
@@ -163,6 +180,7 @@
         ${questionsShown < qs.length ? '<button class="acii-more">Show more questions</button>' : ''}` : ''}`);
 
     body.querySelector('.acii-guide')?.addEventListener('click', () => renderGuided(0));
+    body.querySelector('.acii-histclear')?.addEventListener('click', (e) => { e.stopPropagation(); history.clear(); renderHome(); });
     body.querySelectorAll('.acii-qrow').forEach((el) =>
       el.addEventListener('click', () => ask(el.textContent.trim())));
     const more = body.querySelector('.acii-more');
@@ -211,15 +229,18 @@
       secondary || null,
     ].filter(Boolean);
     const srcDomains = [...new Set((data.sources || []).map((s) => (s.label || hostOf(s.url)).split('/')[0]))].slice(0, 3);
+    // Blocks below the summary fade in after the word-by-word reveal ends.
+    const tail = Math.min((data.summary || '').split(/\s+/).length, 70) * 26 + 150;
+    const after = (i) => `animation-delay:${tail + i * 110}ms`;
 
     const body = setBody(`
       <button class="acii-back">${I.back} Back</button>
       <div>
         <span class="acii-badge ${pathway ? 'acii-badge-path' : ''}">${I.spark} ${pathway ? 'Your personalised pathway · based on your profile' : 'AI-generated · verify sources'}</span>
       </div>
-      <p class="acii-summary acii-stagger" style="--d:1">${esc(data.summary || '')}</p>
+      <p class="acii-summary">${revealWords(data.summary || '')}</p>
       ${(data.items || []).length ? `
-        <div class="acii-items acii-stagger" style="--d:2">
+        <div class="acii-items acii-stagger" style="${after(0)}">
           ${data.items.map((it) => `
             <button class="acii-item" data-url="${esc(it.url)}">
               <span class="acii-item-txt">
@@ -229,21 +250,21 @@
               <span class="acii-item-go">${I.arrow}</span>
             </button>`).join('')}
         </div>` : ''}
-      <button class="acii-listen acii-stagger" style="--d:2" title="Hear this answer">${I.speaker} <span>Listen to this answer</span></button>
+      <button class="acii-listen acii-stagger" style="${after(1)}" title="Hear this answer">${I.speaker} <span>Listen to this answer</span></button>
       ${data.summaryEn && data.lang !== 'en' ? `
-        <div class="acii-english acii-stagger" style="--d:3">
-          <div class="acii-label" style="margin-top:18px">In English</div>
-          <p class="acii-entext">${esc(data.summaryEn)}</p>
+        <div class="acii-english acii-stagger" style="${after(2)}">
+          <button class="acii-entoggle" aria-expanded="false">In English ${I.down}</button>
+          <p class="acii-entext" hidden>${esc(data.summaryEn)}</p>
         </div>` : ''}
       ${buttons.length ? `
-        <div class="acii-actions acii-stagger" style="--d:4">
+        <div class="acii-actions acii-stagger" style="${after(3)}">
           ${buttons.map((b) => `
             <button class="acii-btn ${b.primary ? 'acii-btn-primary acii-shimmer' : 'acii-btn-secondary'}" data-url="${esc(b.url)}">
               ${esc(b.label)}
             </button>`).join('')}
         </div>` : ''}
       ${(data.sources || []).length ? `
-        <button class="acii-srctoggle acii-stagger" style="--d:5" aria-expanded="false">
+        <button class="acii-srctoggle acii-stagger" style="${after(4)}" aria-expanded="false">
           ${srcDomains.map((d) => `<span class="acii-srcdot">${esc(d)}</span>`).join('')}
           <span class="acii-srccount">${data.sources.length} source${data.sources.length > 1 ? 's' : ''}</span>
           ${I.down}
@@ -260,6 +281,13 @@
     body.querySelector('.acii-back').addEventListener('click', goHome);
     body.querySelectorAll('.acii-src, .acii-btn, .acii-item').forEach((el) =>
       el.addEventListener('click', () => window.open(el.dataset.url, '_blank', 'noopener')));
+    const enToggle = body.querySelector('.acii-entoggle');
+    if (enToggle) enToggle.addEventListener('click', () => {
+      const p = body.querySelector('.acii-entext');
+      p.hidden = !p.hidden;
+      enToggle.setAttribute('aria-expanded', String(!p.hidden));
+      enToggle.classList.toggle('acii-srcopen', !p.hidden);
+    });
     const srcToggle = body.querySelector('.acii-srctoggle');
     if (srcToggle) {
       srcToggle.addEventListener('click', () => {
@@ -412,6 +440,7 @@
       });
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error || `Request failed (${res.status})`);
+      history.add(q);
       renderAnswer(q, data, { voice });
     } catch (e) {
       renderError(`Couldn't get an answer: ${e.message}. Please try again.`);
@@ -636,6 +665,14 @@
   /* -------------------------------- utils ----------------------------------- */
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  /** Split text into per-word spans so it streams in like ChatGPT/Claude. */
+  function revealWords(text) {
+    return String(text).split(/(\s+)/).map((part, i) => {
+      if (!part.trim()) return part;
+      const n = Math.min(Math.floor(i / 2), 70);
+      return `<span class="acii-w" style="--w:${n}">${esc(part)}</span>`;
+    }).join('');
   }
   function hostOf(u) {
     try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; }

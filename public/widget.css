@@ -128,6 +128,16 @@
   animation-delay: calc(var(--d, 0) * 70ms);
 }
 .acii-fadein { animation: acii-rise 0.3s ease both; }
+/* ChatGPT/Claude-style streaming reveal: words fade in one after another */
+.acii-w {
+  opacity: 0;
+  animation: acii-wordin 0.32s ease forwards;
+  animation-delay: calc(var(--w, 0) * 26ms);
+}
+@keyframes acii-wordin {
+  from { opacity: 0; filter: blur(2px); }
+  to { opacity: 1; filter: none; }
+}
 
 .acii-label {
   font-size: 11px;
@@ -216,6 +226,21 @@
 .acii-qrow:last-of-type { border-bottom: 0; }
 .acii-qrow:hover { background: #f5f7ff; transform: translateX(2px); }
 .acii-qrow .acii-chev { color: #b6bdcc; flex: none; }
+.acii-recent span { color: #4d5872; font-size: 15.5px; }
+.acii-histclear {
+  border: 0;
+  background: none;
+  color: #98a1b3;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.acii-histclear:hover { color: #b42318; background: #fef3f2; }
+
 .acii-more {
   display: inline-block;
   border: 0;
@@ -358,17 +383,18 @@
 .acii-badge {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: #eef2fe;
-  border: 1px solid #dbe3fb;
-  color: #2b48c7;
-  font-size: 13px;
-  font-weight: 500;
-  border-radius: 10px;
-  padding: 8px 14px;
-  margin: 10px 0 18px;
+  gap: 6px;
+  background: none;
+  border: 0;
+  color: #8b94a7;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0;
+  margin: 12px 0 12px;
 }
-.acii-badge svg { width: 14px; height: 14px; }
+.acii-badge svg { width: 13px; height: 13px; color: #2b48c7; }
 .acii-badge-path {
   border-color: transparent;
   background:
@@ -393,10 +419,10 @@
   background: #f7f9ff;
   color: #2b48c7;
   font: inherit;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   border-radius: 999px;
-  padding: 8px 16px;
+  padding: 7px 14px;
   cursor: pointer;
   transition: background 0.15s ease, transform 0.12s ease;
 }
@@ -445,7 +471,23 @@
 .acii-item-go svg { width: 15px; height: 15px; }
 .acii-item:hover .acii-item-go { background: #1e3fae; color: #fff; }
 
-.acii-english { border-top: 1px solid #eceef4; margin-top: 18px; }
+.acii-english { margin-top: 14px; }
+.acii-entoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #e4e7ee;
+  background: #fbfcfe;
+  color: #5c667e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 6px 13px;
+  cursor: pointer;
+}
+.acii-entoggle:hover { border-color: #2b48c7; background: #f4f6ff; }
+.acii-entext { margin-top: 10px; animation: acii-rise 0.25s ease; }
 .acii-entext { font-size: 15px; line-height: 1.7; color: #5c667e; white-space: pre-wrap; }
 
 /* Collapsed-by-default sources (Perplexity/ChatGPT-style pill) */
@@ -673,6 +715,7 @@
 /* reduced motion: keep it calm */
 @media (prefers-reduced-motion: reduce) {
   .acii-view, .acii-stagger, .acii-srclist { animation: none !important; }
+  .acii-w { animation: none !important; opacity: 1 !important; }
   .acii-orb, .acii-guide-orb, .acii-guide, .acii-modal.acii-listening,
   .acii-shimmer::after, .acii-mic.acii-rec, .acii-listen.acii-speaking { animation: none !important; }
 }

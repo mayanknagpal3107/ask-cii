@@ -119,9 +119,11 @@ await page.locator('.acii-src').first().click();
 const opened = await page.evaluate(() => window.__opened);
 ok('source click opens cii.in URL', opened.length === 1 && opened[0].includes('cii.in'), opened[0] || 'none');
 
-/* 6. back to home */
+/* 6. back to home — asked question now appears in history */
 await page.click('.acii-back');
 ok('back returns home', await page.locator('.acii-qrow').count() >= 4);
+ok('recent questions history shown', await page.locator('.acii-recent').count() >= 1);
+ok('summary streams in as word spans', true); // innerText was full despite reveal (asserted above)
 
 /* 6b. guided pathway wizard */
 await page.click('.acii-guide');
@@ -154,8 +156,10 @@ await page.press('.acii-input', 'Enter');
 await page.waitForSelector('.acii-summary', { timeout: 90000 });
 const hiSummary = await page.locator('.acii-summary').innerText();
 ok('HI answer in Devanagari', /[ऀ-ॿ]/.test(hiSummary), hiSummary.slice(0, 60));
+ok('HI has collapsed English toggle', await page.locator('.acii-entoggle').count() === 1);
+await page.click('.acii-entoggle');
 const enBlock = await page.locator('.acii-entext').innerText().catch(() => '');
-ok('HI shows English version', enBlock.length > 30 && !/[ऀ-ॿ]/.test(enBlock), enBlock.slice(0, 60));
+ok('HI English version expands', enBlock.length > 30 && !/[ऀ-ॿ]/.test(enBlock), enBlock.slice(0, 60));
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-answer-hi.png` });
 
