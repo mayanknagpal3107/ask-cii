@@ -259,8 +259,8 @@
       <button class="acii-listen acii-stagger" style="${after(1)}" title="Hear this answer">${I.speaker} <span>Listen to this answer</span></button>
       ${data.summaryEn && data.lang !== 'en' ? `
         <div class="acii-english acii-stagger" style="${after(2)}">
-          <button class="acii-entoggle" aria-expanded="false">In English ${I.down}</button>
-          <p class="acii-entext" hidden>${linkify(data.summaryEn)}</p>
+          <div class="acii-label" style="margin-top:16px">In English</div>
+          <p class="acii-entext">${linkify(data.summaryEn)}</p>
         </div>` : ''}
       ${buttons.length ? `
         <div class="acii-actions acii-stagger" style="${after(3)}">
@@ -287,13 +287,6 @@
     body.querySelector('.acii-back').addEventListener('click', goHome);
     body.querySelectorAll('.acii-src, .acii-btn, .acii-item').forEach((el) =>
       el.addEventListener('click', () => window.open(el.dataset.url, '_blank', 'noopener')));
-    const enToggle = body.querySelector('.acii-entoggle');
-    if (enToggle) enToggle.addEventListener('click', () => {
-      const p = body.querySelector('.acii-entext');
-      p.hidden = !p.hidden;
-      enToggle.setAttribute('aria-expanded', String(!p.hidden));
-      enToggle.classList.toggle('acii-srcopen', !p.hidden);
-    });
     const srcToggle = body.querySelector('.acii-srctoggle');
     if (srcToggle) {
       srcToggle.addEventListener('click', () => {

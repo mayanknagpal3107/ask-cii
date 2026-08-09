@@ -128,6 +128,22 @@ async function main() {
     console.log(`Synthesized upcoming-events calendar from ${eventPages.length} event pages`);
   }
 
+  // Leadership queries must always surface ALL office bearers, so aggregate
+  // every CII_Leadership page (President, President Designate, Vice
+  // President, Director General) into one retrievable profile page.
+  const leaderPages = [...byUrl.values()].filter((p) => /CII_Leadership\.aspx/i.test(p.url));
+  if (leaderPages.length >= 2) {
+    const parts = leaderPages.map((p) => `${p.title}:\n${p.text.slice(0, 900)}\n(profile: ${p.url})`);
+    byUrl.set('https://www.cii.in/CII_Leadership.aspx', {
+      url: 'https://www.cii.in/CII_Leadership.aspx',
+      title: 'CII Leadership — President, President Designate, Vice President & Director General',
+      type: 'PAGE',
+      description: 'All CII national office bearers: President, President Designate, Vice President and Director General.',
+      text: `CII Leadership — all office bearers of CII (the complete leadership team):\n\n${parts.join('\n\n')}`,
+    });
+    console.log(`Synthesized leadership profile from ${leaderPages.length} pages`);
+  }
+
   const merged = { pages: [...byUrl.values()], pdfs: [...new Map(pdfsIn.map((p) => [p.url, p])).values()] };
   console.log(`Merged ${files.length} file(s): ${merged.pages.length} unique pages, ${merged.pdfs.length} PDFs`);
   const raw = merged;

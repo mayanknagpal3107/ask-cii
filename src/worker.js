@@ -362,11 +362,14 @@ async function handleAsk(request, env, ctx) {
         '3. Keep the summary SHORT: 1–3 sentences, factual. No markdown. Never mention the word "context" or context numbers — cite nothing inline; sources are listed separately. If you fill "items", the summary is exactly ONE sentence introducing the list and MUST NOT name any of the items (they render as cards below it).\n' +
         '4. "summaryEn": the same summary translated to natural English — REQUIRED whenever the answer language is not English; exactly null when the summary is already English.\n' +
         '5. "items": when the question asks about specific THINGS — events, reports/publications, offices, programmes, centres — list up to 6 of them here, each as {"title": exact name, "detail": one short line (for events: date and city; for reports: what it covers), "url": that item\'s own page URL taken from the context text (for events, the event detail/registration link)}. "detail" in the user\'s language; keep proper names as-is. Use [] when the question is not about listable things. When "items" is non-empty the summary must be a SINGLE lead-in sentence and must NOT repeat the item names.\n' +
-        '6. "link": the single best next action. Its "label" MUST be verb-first in the user\'s language (e.g. "Register for FOODPRO 2026", "Download the Annual Report", "Apply for membership") — never a bare page name. URL from the context.\n' +
-        '7. "actions": up to 1 additional {label, url} button, also verb-first. URL from the context.\n' +
-        '8. "sources": array of context numbers (integers) you actually used, most relevant first, max 3.\n' +
-        '9. "place": when the answer points to a physical venue/office/address, that place as a short "Name, City" string (e.g. "Chennai Trade Centre, Chennai" or "CII HQ, New Delhi"); else null.\n' +
-        '10. "confidence": "high" | "medium" | "low" — how well the context answers the question.\n' +
+        '6. LINKS POLICY: every url you output (link, actions, items) MUST be on cii.in or mycii.in — never any other website, even CII-affiliated microsites; if the best page is external, use the closest cii.in page instead.\n' +
+        '7. EVENTS: when the question is about events, always present CII\'s own events (the CII events calendar and cam.mycii.in event pages) first and keep the answer within CII events only.\n' +
+        '7b. LEADERSHIP: when asked about CII\'s leadership in general, ALWAYS name ALL office bearers present in the context — President, President Designate, Vice President, and Director General — as items (one per leader with their role); never mention only one or two of them.\n' +
+        '8. "link": the single best next action. Its "label" MUST be verb-first in the user\'s language (e.g. "Register for FOODPRO 2026", "Download the Annual Report", "Apply for membership") — never a bare page name. URL from the context.\n' +
+        '9. "actions": up to 1 additional {label, url} button, also verb-first. URL from the context.\n' +
+        '10. "sources": array of context numbers (integers) you actually used, most relevant first, max 3.\n' +
+        '11. "place": when the answer points to a physical venue/office/address, that place as a short "Name, City" string (e.g. "Chennai Trade Centre, Chennai" or "CII HQ, New Delhi"); else null.\n' +
+        '12. "confidence": "high" | "medium" | "low" — how well the context answers the question.\n' +
         'Return strict JSON: {"summary": string, "summaryEn": string|null, "items": [{"title","detail","url"}], "link": {"label": string, "url": string}, "actions": [{"label","url"}], "sources": [int], "place": string|null, "confidence": string}',
     },
     { role: 'user', content: `Question (${langName}): ${q}\n\nContext:\n${contextBlock}` },
@@ -390,15 +393,20 @@ async function handleAsk(request, env, ctx) {
       for (const m of t.matchAll(/https?:\/\/[^\s)"'<>\]]+/g)) textUrls.add(m[0].replace(/[.,;:]+$/, ''));
     }
   }
-  const urlOk = (u) => allowed.has(u) || textUrls.has(u);
-  const safeUrl = (u) => (u && urlOk(u) ? u : contexts[0].page.url);
+  // Hard policy: visitors are only ever sent to CII's own properties.
+  const isCiiUrl = (u) => {
+    try { return /(^|\.)(cii\.in|mycii\.in)$/i.test(new URL(u).hostname); } catch { return false; }
+  };
+  const urlOk = (u) => (allowed.has(u) || textUrls.has(u)) && isCiiUrl(u);
+  const ciiFallback = contexts.find((c) => isCiiUrl(c.page.url))?.page.url || 'https://www.cii.in';
+  const safeUrl = (u) => (u && urlOk(u) ? u : ciiFallback);
 
   const sources = (Array.isArray(answer.sources) ? answer.sources : [])
     .map((n) => contexts[n - 1])
-    .filter(Boolean)
+    .filter((c) => c && isCiiUrl(c.page.url))
     .map((c) => ({ title: c.page.title, url: c.page.url, type: c.page.type, label: labelForUrl(c.page.url) }));
   if (!sources.length) {
-    for (const c of contexts.slice(0, 3)) {
+    for (const c of contexts.filter((x) => isCiiUrl(x.page.url)).slice(0, 3)) {
       sources.push({ title: c.page.title, url: c.page.url, type: c.page.type, label: labelForUrl(c.page.url) });
     }
   }

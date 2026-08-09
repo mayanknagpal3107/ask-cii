@@ -165,10 +165,8 @@ await page.press('.acii-input', 'Enter');
 await page.waitForSelector('.acii-summary', { timeout: 90000 });
 const hiSummary = await page.locator('.acii-summary').innerText();
 ok('HI answer in Devanagari', /[ऀ-ॿ]/.test(hiSummary), hiSummary.slice(0, 60));
-ok('HI has collapsed English toggle', await page.locator('.acii-entoggle').count() === 1);
-await page.click('.acii-entoggle');
 const enBlock = await page.locator('.acii-entext').innerText().catch(() => '');
-ok('HI English version expands', enBlock.length > 30 && !/[ऀ-ॿ]/.test(enBlock), enBlock.slice(0, 60));
+ok('HI shows English version by default', enBlock.length > 30 && !/[ऀ-ॿ]/.test(enBlock), enBlock.slice(0, 60));
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-answer-hi.png` });
 
