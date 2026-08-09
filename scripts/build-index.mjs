@@ -133,7 +133,18 @@ async function main() {
   // President, Director General) into one retrievable profile page.
   const leaderPages = [...byUrl.values()].filter((p) => /CII_Leadership\.aspx/i.test(p.url));
   if (leaderPages.length >= 2) {
+    // Explicit "current office bearer" statements so presidency questions
+    // beat stale mentions of past presidents scattered across older pages.
+    const currentLines = leaderPages
+      .filter((p) => /President|Vice President|Director General/i.test(p.title))
+      .map((p) => {
+        const role = p.title.replace(/^CII\s+/i, '');
+        const name = (p.text.split('\n').find((l) => /^(Mr|Ms|Mrs|Dr|Shri|Smt)\b/.test(l.trim())) || '').trim();
+        return name ? `The current ${role} of CII is ${name}.` : '';
+      })
+      .filter(Boolean);
     const parts = leaderPages.map((p) => `${p.title}:\n${p.text.slice(0, 900)}\n(profile: ${p.url})`);
+    parts.unshift(`Who is the President of CII? Who leads CII today?\n${currentLines.join('\n')}`);
     byUrl.set('https://www.cii.in/CII_Leadership.aspx', {
       url: 'https://www.cii.in/CII_Leadership.aspx',
       title: 'CII Leadership — President, President Designate, Vice President & Director General',

@@ -355,8 +355,10 @@ async function handleAsk(request, env, ctx) {
     {
       role: 'system',
       content:
-        'You are "Ask CII", the assistant for the Confederation of Indian Industry website (cii.in). Your goal is to GUIDE the visitor: every answer must lead with the most useful ACTION they can take next.\n' +
+        'You are "Ask CII", the assistant for the Confederation of Indian Industry website (cii.in). Your audience is MSME owners, founders, corporate executives and senior professionals. Your goal is to GUIDE the visitor: every answer must lead with the most useful ACTION they can take next.\n' +
         'Rules:\n' +
+        '0a. TONE: Write like a courteous, precise business advisor — professional and confident, never casual. No slang, no exclamations, no filler. In Hindi/Hinglish always use the respectful register (aap, kijiye/karein — never tu/tum/karo).\n' +
+        '0b. NAMES: Refer to people by their full name with the honorific exactly as the site uses it (e.g. "Mr R Mukundan", "Dr (Mrs) Suchitra K Ella", "Mr Chandrajit Banerjee") — never drop titles, shorten, or use first names alone.\n' +
         `1. Answer ONLY from the numbered context blocks. If they do not contain the answer, say so honestly and point to the closest relevant page. If the user asked MULTIPLE questions, answer EVERY one of them — one short part per question (the summary may then run to 2 sentences per question).\n` +
         `2. Write the summary in ${langName} — the same language and script the user asked in. For Hinglish, write Hindi in Latin script. Never switch to another language.\n` +
         '3. Keep the summary SHORT: 1–3 sentences, factual. No markdown. Never mention the word "context" or context numbers — cite nothing inline; sources are listed separately. If you fill "items", the summary is exactly ONE sentence introducing the list and MUST NOT name any of the items (they render as cards below it).\n' +
@@ -365,6 +367,7 @@ async function handleAsk(request, env, ctx) {
         '6. LINKS POLICY: every url you output (link, actions, items) MUST be on cii.in or mycii.in — never any other website, even CII-affiliated microsites; if the best page is external, use the closest cii.in page instead.\n' +
         '7. EVENTS: when the question is about events, always present CII\'s own events (the CII events calendar and cam.mycii.in event pages) first and keep the answer within CII events only.\n' +
         '7b. LEADERSHIP: when asked about CII\'s leadership in general, ALWAYS name ALL office bearers present in the context — President, President Designate, Vice President, and Director General — as items (one per leader with their role); never mention only one or two of them.\n' +
+        '7c. RECENCY: if context blocks disagree (e.g. different people named for the same role, or different years), trust the dedicated CII Leadership page and the most recent year (2026-27 over older years); never present a past office bearer as current.\n' +
         '8. "link": the single best next action. Its "label" MUST be verb-first in the user\'s language (e.g. "Register for FOODPRO 2026", "Download the Annual Report", "Apply for membership") — never a bare page name. URL from the context.\n' +
         '9. "actions": up to 1 additional {label, url} button, also verb-first. URL from the context.\n' +
         '10. "sources": array of context numbers (integers) you actually used, most relevant first, max 3.\n' +
@@ -418,7 +421,9 @@ async function handleAsk(request, env, ctx) {
     .map((it) => String(it?.title || '').slice(0, 18))
     .filter((t) => t.length > 6);
   const trimListing = (text) => {
-    if (!text || itemTitles.length < 2) return text;
+    // Short factual summaries legitimately name an item ("The current
+    // President of CII is Mr R Mukundan.") — only trim long enumerations.
+    if (!text || text.length < 220 || itemTitles.length < 2) return text;
     const hits = itemTitles.map((t) => text.indexOf(t)).filter((i) => i >= 0);
     if (hits.length < 2) return text;
     const cut = Math.min(...hits);
@@ -618,10 +623,20 @@ async function smallestTts(env, text, langCode) {
   return out;
 }
 
+/** Prepare answer text for speech: acronyms letter-by-letter, clean spacing. */
+function ttsNormalize(text) {
+  return text
+    .replace(/\bCII\b/g, 'C I I')     // say the letters, not "sea"
+    .replace(/\bIGBC\b/g, 'I G B C')
+    .replace(/\bMSMEs?\b/g, (m) => (m.endsWith('s') ? 'M S M E s' : 'M S M E'))
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 async function handleTts(request, env, ctx) {
   const t0 = Date.now();
   const body = await request.json().catch(() => ({}));
-  const input = (body.text || '').trim().slice(0, 1600);
+  const input = ttsNormalize((body.text || '').trim().slice(0, 1600));
   if (!input) return json({ error: 'Missing "text".' }, 400);
 
   // Indian-language answers use Smallest.ai's Lightning voices when a key is
@@ -651,9 +666,10 @@ async function handleTts(request, env, ctx) {
     voice,
     input,
     instructions:
-      `Speak naturally and clearly, like a helpful Indian assistant. ` +
-      `The text is in ${body.langName || 'English'}; pronounce it with the appropriate accent for that language ` +
-      `(Indian English, Hindi, Hinglish, or Punjabi). Keep a warm, professional tone at a moderate pace.`,
+      `Speak like a courteous, professional Indian business advisor addressing executives and founders. ` +
+      `The text is in ${body.langName || 'English'}; use the authentic accent for that language ` +
+      `(Indian English, Hindi, Hinglish, or Punjabi). Pronounce Indian names, honorifics and place names correctly ` +
+      `and with respect. Read acronyms letter by letter. Measured pace, warm but formal tone.`,
     response_format: 'mp3',
   }, { raw: true, timeoutMs: 90000 });
 
