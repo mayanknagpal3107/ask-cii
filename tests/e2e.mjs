@@ -175,7 +175,12 @@ await page.fill('.acii-input', 'CII ke upcoming events kya hain?');
 await page.press('.acii-input', 'Enter');
 await page.waitForSelector('.acii-summary', { timeout: 90000 });
 const hinSummary = await page.locator('.acii-summary').innerText();
-ok('Hinglish answer stays Latin', !/[ऀ-ॿ]/.test(hinSummary) && hinSummary.length > 30, hinSummary.slice(0, 70));
+ok('Hinglish answer stays Latin', !/[ऀ-ॿ]/.test(hinSummary) && hinSummary.length > 10, hinSummary.slice(0, 70));
+ok('event items rendered with own links', await page.locator('.acii-item').count() >= 2, `${await page.locator('.acii-item').count()} items`);
+const itemUrl = await page.locator('.acii-item').first().getAttribute('data-url');
+ok('event item links to its event page', /cam\.mycii\.in|cii\.in/.test(itemUrl || ''), (itemUrl || '').slice(0, 60));
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${SCRATCH}/e2e-events-items.png` });
 
 /* 10. VOICE MODE — fake mic plays the Hinglish question WAV */
 await page.click('.acii-back');

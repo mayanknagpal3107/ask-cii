@@ -328,27 +328,28 @@ async function handleAsk(request, env, ctx) {
 
   // Step 2 — grounded answer in the asker's language.
   const contextBlock = contexts
-    .map((c, i) => `[${i + 1}] ${c.page.title} (${c.page.type})\nURL: ${c.page.url}\n${c.texts.join('\n---\n').slice(0, 2600)}`)
+    .map((c, i) => `[${i + 1}] ${c.page.title} (${c.page.type})\nURL: ${c.page.url}\n${c.texts.join('\n---\n').slice(0, 3200)}`)
     .join('\n\n');
 
   const answer = await chatJSON(env, [
     {
       role: 'system',
       content:
-        'You are "Ask CII", the assistant for the Confederation of Indian Industry website (cii.in). Your goal is to GUIDE the visitor to the right place on the site.\n' +
+        'You are "Ask CII", the assistant for the Confederation of Indian Industry website (cii.in). Your goal is to GUIDE the visitor: every answer must lead with the most useful ACTION they can take next.\n' +
         'Rules:\n' +
         `1. Answer ONLY from the numbered context blocks. If they do not contain the answer, say so honestly and point to the closest relevant page.\n` +
         `2. Write the summary in ${langName} — the same language and script the user asked in. For Hinglish, write Hindi in Latin script. Never switch to another language.\n` +
-        '3. Keep the summary to 2–4 short sentences, factual and helpful. No markdown. Never mention the word "context" or context numbers — cite nothing inline; sources are listed separately.\n' +
+        '3. Keep the summary SHORT: 1–3 sentences, factual. No markdown. Never mention the word "context" or context numbers — cite nothing inline; sources are listed separately. If you fill "items", the summary is exactly ONE sentence introducing the list and MUST NOT name any of the items (they render as cards below it).\n' +
         '4. "summaryEn": the same summary translated to natural English — REQUIRED whenever the answer language is not English; exactly null when the summary is already English.\n' +
-        '5. "link" is the single best page for the user to open next (must be a URL from the context). Its "label" is a short call-to-action in the user\'s language.\n' +
-        '6. "actions": up to 2 buttons {label, url} for the most useful next steps (e.g. start a membership request, contact an office). URLs must come from the context. Labels in the user\'s language.\n' +
-        '7. "sources": array of context numbers (integers) you actually used, most relevant first, max 3.\n' +
-        '8. "confidence": "high" | "medium" | "low" — how well the context answers the question.\n' +
-        'Return strict JSON: {"summary": string, "summaryEn": string|null, "link": {"label": string, "url": string}, "actions": [{"label","url"}], "sources": [int], "confidence": string}',
+        '5. "items": when the question asks about specific THINGS — events, reports/publications, offices, programmes, centres — list up to 6 of them here, each as {"title": exact name, "detail": one short line (for events: date and city; for reports: what it covers), "url": that item\'s own page URL taken from the context text (for events, the event detail/registration link)}. "detail" in the user\'s language; keep proper names as-is. Use [] when the question is not about listable things. When "items" is non-empty the summary must be a SINGLE lead-in sentence and must NOT repeat the item names.\n' +
+        '6. "link": the single best next action. Its "label" MUST be verb-first in the user\'s language (e.g. "Register for FOODPRO 2026", "Download the Annual Report", "Apply for membership") — never a bare page name. URL from the context.\n' +
+        '7. "actions": up to 1 additional {label, url} button, also verb-first. URL from the context.\n' +
+        '8. "sources": array of context numbers (integers) you actually used, most relevant first, max 3.\n' +
+        '9. "confidence": "high" | "medium" | "low" — how well the context answers the question.\n' +
+        'Return strict JSON: {"summary": string, "summaryEn": string|null, "items": [{"title","detail","url"}], "link": {"label": string, "url": string}, "actions": [{"label","url"}], "sources": [int], "confidence": string}',
     },
     { role: 'user', content: `Question (${langName}): ${q}\n\nContext:\n${contextBlock}` },
-  ], 700).catch(() => ({
+  ], 950).catch(() => ({
     // Extractive fallback keeps the widget alive if the answer call fails.
     summary: contexts[0].texts[0].split('\n').slice(1).join(' ').slice(0, 300),
     link: { label: 'Open page', url: contexts[0].page.url },
@@ -357,11 +358,19 @@ async function handleAsk(request, env, ctx) {
     confidence: 'low',
   }));
 
-  // Server-side grounding: only URLs that exist in the retrieved context (or
-  // the site root) may be returned.
+  // Server-side grounding: only URLs that exist in the retrieved context —
+  // as a context page or mentioned inside context text (e.g. per-event
+  // registration links) — may be returned.
   const allowed = new Map(contexts.map((c) => [c.page.url, c.page]));
   allowed.set('https://www.cii.in', { url: 'https://www.cii.in', title: 'CII — Confederation of Indian Industry', type: 'PAGE' });
-  const safeUrl = (u) => (u && allowed.has(u) ? u : contexts[0].page.url);
+  const textUrls = new Set();
+  for (const c of contexts) {
+    for (const t of c.texts) {
+      for (const m of t.matchAll(/https?:\/\/[^\s)"'<>\]]+/g)) textUrls.add(m[0].replace(/[.,;:]+$/, ''));
+    }
+  }
+  const urlOk = (u) => allowed.has(u) || textUrls.has(u);
+  const safeUrl = (u) => (u && urlOk(u) ? u : contexts[0].page.url);
 
   const sources = (Array.isArray(answer.sources) ? answer.sources : [])
     .map((n) => contexts[n - 1])
@@ -373,14 +382,40 @@ async function handleAsk(request, env, ctx) {
     }
   }
 
-  const summary = String(answer.summary || '').slice(0, 1200);
+  // Deterministic guard: if the summary re-lists the items (models love to),
+  // cut it at the first item mention and close it as a list lead — the items
+  // render as cards right below.
+  const itemTitles = (Array.isArray(answer.items) ? answer.items : [])
+    .map((it) => String(it?.title || '').slice(0, 18))
+    .filter((t) => t.length > 6);
+  const trimListing = (text) => {
+    if (!text || itemTitles.length < 2) return text;
+    const hits = itemTitles.map((t) => text.indexOf(t)).filter((i) => i >= 0);
+    if (hits.length < 2) return text;
+    const cut = Math.min(...hits);
+    if (cut < 15) return text; // starts with a title — leave it alone
+    return `${text.slice(0, cut).trim().replace(/[,:;(–—-]+$/, '')}:`;
+  };
+  const summary = trimListing(String(answer.summary || '').slice(0, 1200));
   // English companion answer — only when the reply itself isn't English.
   const summaryEn = lang !== 'en' && answer.summaryEn && String(answer.summaryEn).trim()
-    ? String(answer.summaryEn).slice(0, 1200)
+    ? trimListing(String(answer.summaryEn).slice(0, 1200))
     : null;
+  // Item lists (events, reports, offices...) — each entry keeps its own link
+  // so the visitor can act on the specific thing, not just a section page.
+  const items = (Array.isArray(answer.items) ? answer.items : [])
+    .filter((it) => it && it.title && it.url && urlOk(it.url))
+    .slice(0, 6)
+    .map((it) => ({
+      title: String(it.title).slice(0, 140),
+      detail: String(it.detail || '').slice(0, 160),
+      url: it.url,
+    }));
+
   const payload = {
     summary,
     summaryEn,
+    items,
     lang,
     langName,
     link: {

@@ -413,6 +413,38 @@
   background-size: 100% 100%, 280% 280%;
 }
 
+/* item lists: events / reports / offices — each row is its own action */
+.acii-items { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.acii-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  border: 1px solid #e4e7ee;
+  border-radius: 12px;
+  background: #fbfcfe;
+  font: inherit;
+  text-align: left;
+  padding: 13px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+.acii-item:hover { border-color: #2b48c7; transform: translateY(-1px); box-shadow: 0 6px 16px rgba(43, 72, 199, 0.1); }
+.acii-item-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.acii-item-txt b { font-size: 15.5px; font-weight: 600; color: #16203a; line-height: 1.4; }
+.acii-item-txt small { font-size: 13.5px; color: #7a8398; }
+.acii-item-go {
+  flex: none;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: #edf1fd;
+  color: #2b48c7;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.acii-item-go svg { width: 15px; height: 15px; }
+.acii-item:hover .acii-item-go { background: #1e3fae; color: #fff; }
+
 .acii-english { border-top: 1px solid #eceef4; margin-top: 18px; }
 .acii-entext { font-size: 15px; line-height: 1.7; color: #5c667e; white-space: pre-wrap; }
 

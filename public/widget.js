@@ -218,6 +218,17 @@
         <span class="acii-badge ${pathway ? 'acii-badge-path' : ''}">${I.spark} ${pathway ? 'Your personalised pathway · based on your profile' : 'AI-generated · verify sources'}</span>
       </div>
       <p class="acii-summary acii-stagger" style="--d:1">${esc(data.summary || '')}</p>
+      ${(data.items || []).length ? `
+        <div class="acii-items acii-stagger" style="--d:2">
+          ${data.items.map((it) => `
+            <button class="acii-item" data-url="${esc(it.url)}">
+              <span class="acii-item-txt">
+                <b>${esc(it.title)}</b>
+                ${it.detail ? `<small>${esc(it.detail)}</small>` : ''}
+              </span>
+              <span class="acii-item-go">${I.arrow}</span>
+            </button>`).join('')}
+        </div>` : ''}
       <button class="acii-listen acii-stagger" style="--d:2" title="Hear this answer">${I.speaker} <span>Listen to this answer</span></button>
       ${data.summaryEn && data.lang !== 'en' ? `
         <div class="acii-english acii-stagger" style="--d:3">
@@ -247,7 +258,7 @@
         </div>` : ''}`);
 
     body.querySelector('.acii-back').addEventListener('click', goHome);
-    body.querySelectorAll('.acii-src, .acii-btn').forEach((el) =>
+    body.querySelectorAll('.acii-src, .acii-btn, .acii-item').forEach((el) =>
       el.addEventListener('click', () => window.open(el.dataset.url, '_blank', 'noopener')));
     const srcToggle = body.querySelector('.acii-srctoggle');
     if (srcToggle) {
