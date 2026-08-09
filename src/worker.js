@@ -229,10 +229,10 @@ async function chatJSON(env, messages, maxTokens = 700) {
 /* -------------------------------- /api/ask --------------------------------- */
 
 async function handleAsk(request, env, ctx) {
-  const { question, voice } = await request.json().catch(() => ({}));
-  const q = (question || '').trim().slice(0, 600);
+  const { question, voice, guided } = await request.json().catch(() => ({}));
+  const q = (question || '').trim().slice(0, 900);
   if (!q) return json({ error: 'Missing "question".' }, 400);
-  const mode = voice ? 'voice' : 'text';
+  const mode = guided ? 'guided' : voice ? 'voice' : 'text';
   const t0 = Date.now();
 
   const origin = new URL(request.url).origin;
@@ -297,7 +297,7 @@ async function handleAsk(request, env, ctx) {
         'Rules:\n' +
         `1. Answer ONLY from the numbered context blocks. If they do not contain the answer, say so honestly and point to the closest relevant page.\n` +
         `2. Write the summary in ${langName} — the same language and script the user asked in. For Hinglish, write Hindi in Latin script. Never switch to another language.\n` +
-        '3. Keep the summary to 2–4 short sentences, factual and helpful. No markdown.\n' +
+        '3. Keep the summary to 2–4 short sentences, factual and helpful. No markdown. Never mention the word "context" or context numbers — cite nothing inline; sources are listed separately.\n' +
         '4. "summaryEn": the same summary translated to natural English — REQUIRED whenever the answer language is not English; exactly null when the summary is already English.\n' +
         '5. "link" is the single best page for the user to open next (must be a URL from the context). Its "label" is a short call-to-action in the user\'s language.\n' +
         '6. "actions": up to 2 buttons {label, url} for the most useful next steps (e.g. start a membership request, contact an office). URLs must come from the context. Labels in the user\'s language.\n' +

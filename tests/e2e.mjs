@@ -86,25 +86,29 @@ await page.keyboard.press('Control+KeyK');
 await page.waitForSelector('.acii-overlay.acii-open', { timeout: 5000 });
 ok('Ctrl+K opens popup', true);
 
-/* 3. home view (chips render once /api/suggestions resolves) */
-await page.waitForSelector('.acii-chip', { timeout: 15000 });
-ok('try-asking chips', await page.locator('.acii-chip').count() >= 4);
-ok('common questions (3 shown)', await page.locator('.acii-qrow').count() === 3);
+/* 3. home view (renders once /api/suggestions resolves) */
+await page.waitForSelector('.acii-qrow', { timeout: 15000 });
+ok('guided pathway CTA on home', await page.locator('.acii-guide').count() === 1);
+ok('merged question list (4 shown)', await page.locator('.acii-qrow').count() === 4);
 await page.click('.acii-more');
-ok('load more reveals all', await page.locator('.acii-qrow').count() === 6);
-ok('quick action cards', await page.locator('.acii-card').count() === 3);
+ok('show more reveals all questions', await page.locator('.acii-qrow').count() >= 8);
+ok('quick actions removed', await page.locator('.acii-card').count() === 0);
+await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-home.png` });
 
-/* 4. English ask via chip */
-await page.locator('.acii-chip', { hasText: 'How do I become a member?' }).click();
+/* 4. English ask via question row */
+await page.locator('.acii-qrow', { hasText: 'How do I become a member?' }).click();
 await page.waitForSelector('.acii-summary', { timeout: 90000 });
 const enSummary = await page.locator('.acii-summary').innerText();
 ok('EN answer renders', enSummary.length > 40, enSummary.slice(0, 70));
 ok('EN AI badge', await page.locator('.acii-badge').count() === 1);
 ok('EN sources collapsed by default', await page.locator('.acii-srctoggle').count() === 1 && !(await page.locator('.acii-srclist:not([hidden])').count()));
-ok('EN action buttons', await page.locator('.acii-btn').count() >= 1);
+const btnCount = await page.locator('.acii-actions .acii-btn').count();
+ok('CTAs capped at 2 (primary + secondary)', btnCount >= 1 && btnCount <= 2, `${btnCount} buttons`);
+ok('primary CTA has shimmer', await page.locator('.acii-actions .acii-btn-primary.acii-shimmer').count() === 1);
 ok('EN listen button', await page.locator('.acii-listen').count() === 1);
 ok('EN has no duplicate English block', await page.locator('.acii-english').count() === 0);
+await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-answer-en.png` });
 
 /* 5. expand sources, then click one (window.open stubbed — no egress in sandbox) */
@@ -117,7 +121,32 @@ ok('source click opens cii.in URL', opened.length === 1 && opened[0].includes('c
 
 /* 6. back to home */
 await page.click('.acii-back');
-ok('back returns home', await page.locator('.acii-chip').count() >= 4);
+ok('back returns home', await page.locator('.acii-qrow').count() >= 4);
+
+/* 6b. guided pathway wizard */
+await page.click('.acii-guide');
+await page.waitForSelector('.acii-persona', { timeout: 5000 });
+ok('wizard step 1: persona cards', await page.locator('.acii-persona').count() === 8);
+await page.locator('.acii-persona', { hasText: 'Startup Founder' }).click();
+await page.waitForSelector('.acii-chip', { timeout: 5000 });
+ok('wizard step 2: sector chips', await page.locator('.acii-chip').count() >= 10);
+await page.locator('.acii-chip', { hasText: 'Energy & Renewables' }).click();
+await page.waitForTimeout(400);
+await page.locator('.acii-chip', { hasText: 'Global Trade & Investment' }).click();
+await page.waitForTimeout(400);
+await page.locator('.acii-chip', { hasText: 'Northern India' }).click();
+await page.waitForSelector('.acii-gosubmit', { timeout: 5000 });
+ok('wizard step 5: details + submit', await page.locator('.acii-company').count() === 1);
+await page.fill('.acii-help', 'finding export partners in the EU');
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${SCRATCH}/e2e-wizard.png` });
+await page.click('.acii-gosubmit');
+await page.waitForSelector('.acii-summary', { timeout: 90000 });
+ok('personalised pathway answer', (await page.locator('.acii-summary').innerText()).length > 60);
+ok('pathway badge shown', await page.locator('.acii-badge-path').count() === 1);
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${SCRATCH}/e2e-pathway.png` });
+await page.click('.acii-back');
 
 /* 7. Hindi */
 await page.fill('.acii-input', 'CII की सदस्यता कैसे लें?');
@@ -127,6 +156,7 @@ const hiSummary = await page.locator('.acii-summary').innerText();
 ok('HI answer in Devanagari', /[ऀ-ॿ]/.test(hiSummary), hiSummary.slice(0, 60));
 const enBlock = await page.locator('.acii-entext').innerText().catch(() => '');
 ok('HI shows English version', enBlock.length > 30 && !/[ऀ-ॿ]/.test(enBlock), enBlock.slice(0, 60));
+await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-answer-hi.png` });
 
 /* 8. Punjabi */
@@ -136,6 +166,7 @@ await page.press('.acii-input', 'Enter');
 await page.waitForSelector('.acii-summary', { timeout: 90000 });
 const paSummary = await page.locator('.acii-summary').innerText();
 ok('PA answer in Gurmukhi', /[਀-੿]/.test(paSummary), paSummary.slice(0, 60));
+await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-answer-pa.png` });
 
 /* 9. Hinglish stays Latin */
@@ -165,12 +196,15 @@ await page.waitForSelector('.acii-mic.acii-rec', { timeout: 5000 });
 ok('recording state shown (mic button)', true);
 await page.waitForSelector('.acii-voice-panel', { timeout: 5000 });
 ok('listening panel with waveform', await page.locator('.acii-wave').count() === 1);
+ok('Siri orb shown', await page.locator('.acii-orb-lg').count() === 1);
+ok('Apple-style listening glow on modal', await page.locator('.acii-modal.acii-listening').count() === 1);
 ok('explicit Done button', await page.locator('.acii-voice-done').count() === 1);
 ok('explicit Cancel button', await page.locator('.acii-voice-cancel').count() === 1);
 const timer1 = await page.locator('.acii-voice-timer').innerText();
 await page.waitForTimeout(9000); // capture the ~5s spoken question
 const timer2 = await page.locator('.acii-voice-timer').innerText();
 ok('timer is counting', timer1 !== timer2, `${timer1} -> ${timer2}`);
+await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-recording.png` });
 await page.click('.acii-voice-done'); // stop via the explicit button
 await page.waitForSelector('.acii-summary', { timeout: 120000 });
@@ -189,6 +223,7 @@ if (hasAudioOut) {
 } else {
   console.log('SKIP  audio playback assertion — no audio output device in this environment');
 }
+await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-voice-answer.png` });
 
 } catch (e) { fail++; console.log('FAIL  voice flow crashed —', e.message.split('\n')[0]); }

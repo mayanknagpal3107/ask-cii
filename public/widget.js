@@ -26,22 +26,34 @@
     stop: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>',
     x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
     chev: '<svg class="acii-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>',
+    down: '<svg class="acii-srcchev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
     back: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
     speaker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6.5 9H3v6h3.5L11 19zM15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/></svg>',
     pause: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
     enter: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><path d="M20 5v6a3 3 0 01-3 3H5M9 10l-4 4 4 4"/></svg>',
+    // guided-flow persona icons
+    building: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10.5 21v-3h3v3"/></svg>',
+    chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 19h16M5 15l4-4 3 3 6-6"/><path d="M14 8h4v4"/></svg>',
+    rocket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15c-1-3 0-7.5 4.5-10.5 1.5 4-1 9-4.5 10.5z"/><path d="M12 15l-3-3M9 12c-2 0-3.5 1-4.5 3.5C6.5 15 8 15 9 15m3 0c0 2-1 3.5-3.5 4.5.5-2 .5-3.5.5-4.5"/><circle cx="14.5" cy="8.5" r="1"/></svg>',
+    people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19c.7-3 3-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/><circle cx="16.5" cy="9.5" r="2.2"/><path d="M16 14.6c2 .2 3.8 1.5 4.4 3.9"/></svg>',
+    cap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 9.5L12 5l9.5 4.5L12 14 2.5 9.5z"/><path d="M6.5 11.5v4.2c0 1 2.5 2.3 5.5 2.3s5.5-1.3 5.5-2.3v-4.2M21 10v5"/></svg>',
+    org: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="9.5" y="3" width="5" height="5" rx="1"/><rect x="3" y="16" width="5" height="5" rx="1"/><rect x="16" y="16" width="5" height="5" rx="1"/><path d="M12 8v4M12 12H5.5v4M12 12h6.5v4"/></svg>',
+    globe: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.3 3.8 5.2 3.8 8.5s-1.3 6.2-3.8 8.5c-2.5-2.3-3.8-5.2-3.8-8.5s1.3-6.2 3.8-8.5z"/></svg>',
+    heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7.5-4.6-9.3-9.3C1.5 7.5 3.6 4.5 6.8 4.5c2 0 3.7 1.2 5.2 3 1.5-1.8 3.2-3 5.2-3 3.2 0 5.3 3 4.1 6.2C19.5 15.4 12 20 12 20z"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12.5l5 5 10-11"/></svg>',
   };
 
   /* ------------------------------- state ----------------------------------- */
   let overlay = null;
   let suggestions = null;
-  let questionsShown = 3;
+  let questionsShown = 4;
   let lastAnswer = null;
   let audioEl = null;
   let recorder = null;
   let recChunks = [];
   let recCancelled = false;
   let busy = false;
+  let profile = {}; // guided-flow selections
 
   const $ = (sel, root) => (root || overlay).querySelector(sel);
 
@@ -90,13 +102,20 @@
     loadSuggestions();
   }
 
+  /** Swap body content with a quick fade/rise transition. */
+  function setBody(html) {
+    const body = $('.acii-body');
+    body.innerHTML = `<div class="acii-view">${html}</div>`;
+    return body;
+  }
+
   /* ---------------------------- suggestions --------------------------------- */
   async function loadSuggestions() {
     try {
       const res = await fetch(`${ENDPOINT}/api/suggestions`);
       suggestions = await res.json();
     } catch {
-      suggestions = { tryAsking: [], commonQuestions: [], quickActions: [] };
+      suggestions = { questions: [] };
     }
     if (suggestions.placeholder) $('.acii-input').placeholder = suggestions.placeholder;
     renderHome();
@@ -105,86 +124,101 @@
   /* -------------------------------- views ----------------------------------- */
   function renderHome() {
     if (!overlay || !suggestions) return;
-    const body = $('.acii-body');
-    const qs = suggestions.commonQuestions || [];
-    body.innerHTML = `
-      ${(suggestions.tryAsking || []).length ? `
-        <div class="acii-label">Try asking</div>
-        <div class="acii-chips">
-          ${suggestions.tryAsking.map((t) => `<button class="acii-chip">${esc(t)}</button>`).join('')}
-        </div>` : ''}
+    setListening(false);
+    const qs = suggestions.questions
+      || [...(suggestions.tryAsking || []), ...(suggestions.commonQuestions || [])];
+    const g = suggestions.guided;
+    const body = setBody(`
+      ${g ? `
+        <button class="acii-guide">
+          <span class="acii-guide-orb"></span>
+          <span class="acii-guide-txt">
+            <b>${esc(g.title)}</b>
+            <small>${esc(g.subtitle)}</small>
+          </span>
+          ${I.chev}
+        </button>` : ''}
       ${qs.length ? `
-        <div class="acii-label">Common questions</div>
+        <div class="acii-label">Ask anything</div>
         <div class="acii-qlist">
           ${qs.slice(0, questionsShown).map((t) => `<button class="acii-qrow"><span>${esc(t)}</span>${I.chev}</button>`).join('')}
         </div>
-        ${questionsShown < qs.length ? '<button class="acii-more">Load more</button>' : ''}` : ''}
-      ${(suggestions.quickActions || []).length ? `
-        <div class="acii-label">Quick actions</div>
-        <div class="acii-cards">
-          ${suggestions.quickActions.map((a) => `
-            <button class="acii-card" data-q="${esc(a.question || a.title)}" data-url="${esc(a.url || '')}">
-              <h4>${esc(a.title)}</h4><p>${esc(a.subtitle || '')}</p>
-            </button>`).join('')}
-        </div>` : ''}`;
+        ${questionsShown < qs.length ? '<button class="acii-more">Show more questions</button>' : ''}` : ''}`);
 
-    body.querySelectorAll('.acii-chip, .acii-qrow').forEach((el) =>
+    body.querySelector('.acii-guide')?.addEventListener('click', () => renderGuided(0));
+    body.querySelectorAll('.acii-qrow').forEach((el) =>
       el.addEventListener('click', () => ask(el.textContent.trim())));
     const more = body.querySelector('.acii-more');
     if (more) more.addEventListener('click', () => { questionsShown = qs.length; renderHome(); });
-    body.querySelectorAll('.acii-card').forEach((el) =>
-      el.addEventListener('click', () => (el.dataset.url ? window.open(el.dataset.url, '_blank') : ask(el.dataset.q))));
   }
 
-  function renderThinking(q, note) {
-    const body = $('.acii-body');
-    body.innerHTML = `
-      <div class="acii-status"><span class="acii-dots"><i></i><i></i><i></i></span> ${esc(note || 'Searching cii.in…')}</div>
+  const THINKING_STEPS = ['Searching cii.in…', 'Reading the best sources…', 'Writing your answer…'];
+  let thinkTimer = null;
+
+  function renderThinking(note) {
+    const body = setBody(`
+      <div class="acii-think">
+        <span class="acii-orb acii-orb-sm"></span>
+        <span class="acii-think-txt">${esc(note || THINKING_STEPS[0])}</span>
+      </div>
       <div class="acii-skel" style="width:92%"></div>
       <div class="acii-skel" style="width:84%"></div>
-      <div class="acii-skel" style="width:64%"></div>`;
+      <div class="acii-skel" style="width:64%"></div>`);
+    clearInterval(thinkTimer);
+    if (!note) {
+      let i = 0;
+      thinkTimer = setInterval(() => {
+        i = Math.min(i + 1, THINKING_STEPS.length - 1);
+        const el = body.querySelector('.acii-think-txt');
+        if (el) { el.textContent = THINKING_STEPS[i]; el.classList.remove('acii-fadein'); void el.offsetWidth; el.classList.add('acii-fadein'); }
+        if (i === THINKING_STEPS.length - 1) clearInterval(thinkTimer);
+      }, 2400);
+    }
   }
 
   function renderError(msg) {
-    const body = $('.acii-body');
-    body.innerHTML = `
+    setListening(false);
+    const body = setBody(`
       <button class="acii-back">${I.back} Back</button>
-      <div class="acii-error">${esc(msg)}</div>`;
-    $('.acii-back').addEventListener('click', goHome);
+      <div class="acii-error">${esc(msg)}</div>`);
+    body.querySelector('.acii-back').addEventListener('click', goHome);
   }
 
-  function renderAnswer(q, data, { voice } = {}) {
+  function renderAnswer(q, data, { voice = false, pathway = false } = {}) {
+    clearInterval(thinkTimer);
     lastAnswer = data;
-    const body = $('.acii-body');
+    // Max two CTAs: one primary (the best link) + one secondary.
+    const secondary = (data.actions || []).find((a) => a && a.url && a.url !== data.link?.url);
     const buttons = [
-      { ...data.link, primary: true },
-      ...(data.actions || []).filter((a) => a.url !== data.link?.url),
-    ].filter((b) => b && b.url).slice(0, 3);
+      data.link?.url ? { ...data.link, primary: true } : null,
+      secondary || null,
+    ].filter(Boolean);
+    const srcDomains = [...new Set((data.sources || []).map((s) => (s.label || hostOf(s.url)).split('/')[0]))].slice(0, 3);
 
-    body.innerHTML = `
+    const body = setBody(`
       <button class="acii-back">${I.back} Back</button>
       <div>
-        <span class="acii-badge">${I.spark} AI-generated · verify sources</span>
+        <span class="acii-badge ${pathway ? 'acii-badge-path' : ''}">${I.spark} ${pathway ? 'Your personalised pathway · based on your profile' : 'AI-generated · verify sources'}</span>
       </div>
-      <p class="acii-summary">${esc(data.summary || '')}</p>
-      <button class="acii-listen" title="Hear this answer">${I.speaker} <span>Listen to this answer</span></button>
+      <p class="acii-summary acii-stagger" style="--d:1">${esc(data.summary || '')}</p>
+      <button class="acii-listen acii-stagger" style="--d:2" title="Hear this answer">${I.speaker} <span>Listen to this answer</span></button>
       ${data.summaryEn && data.lang !== 'en' ? `
-        <div class="acii-english">
+        <div class="acii-english acii-stagger" style="--d:3">
           <div class="acii-label" style="margin-top:18px">In English</div>
           <p class="acii-entext">${esc(data.summaryEn)}</p>
         </div>` : ''}
       ${buttons.length ? `
-        <div class="acii-actions">
+        <div class="acii-actions acii-stagger" style="--d:4">
           ${buttons.map((b) => `
-            <button class="acii-btn ${b.primary ? 'acii-btn-primary' : 'acii-btn-secondary'}" data-url="${esc(b.url)}">
+            <button class="acii-btn ${b.primary ? 'acii-btn-primary acii-shimmer' : 'acii-btn-secondary'}" data-url="${esc(b.url)}">
               ${esc(b.label)}
             </button>`).join('')}
         </div>` : ''}
       ${(data.sources || []).length ? `
-        <button class="acii-srctoggle" aria-expanded="false">
-          ${[...new Set(data.sources.map((s) => (s.label || hostOf(s.url)).split('/')[0]))].slice(0, 3).map((d) => `<span class="acii-srcdot">${esc(d)}</span>`).join('')}
+        <button class="acii-srctoggle acii-stagger" style="--d:5" aria-expanded="false">
+          ${srcDomains.map((d) => `<span class="acii-srcdot">${esc(d)}</span>`).join('')}
           <span class="acii-srccount">${data.sources.length} source${data.sources.length > 1 ? 's' : ''}</span>
-          <svg class="acii-srcchev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          ${I.down}
         </button>
         <div class="acii-srclist" hidden>
           ${data.sources.map((s) => `
@@ -193,9 +227,9 @@
               <span class="acii-srctitle">${esc(s.title)}</span>
               <span class="acii-srchost">${esc(s.label || hostOf(s.url))}</span>
             </button>`).join('')}
-        </div>` : ''}`;
+        </div>` : ''}`);
 
-    $('.acii-back').addEventListener('click', goHome);
+    body.querySelector('.acii-back').addEventListener('click', goHome);
     body.querySelectorAll('.acii-src, .acii-btn').forEach((el) =>
       el.addEventListener('click', () => window.open(el.dataset.url, '_blank', 'noopener')));
     const srcToggle = body.querySelector('.acii-srctoggle');
@@ -210,17 +244,125 @@
     }
     const listen = body.querySelector('.acii-listen');
     listen.addEventListener('click', () => playAnswer(listen));
-    // The user asked by voice — surface the audio option prominently and
-    // start speaking right away (the mic tap counts as the user gesture).
+    // The user asked by voice — start speaking right away (the mic tap counts
+    // as the user gesture).
     if (voice && data.summary) playAnswer(listen);
   }
 
   function goHome() {
     stopAudio();
+    clearInterval(thinkTimer);
     const input = $('.acii-input');
     input.value = '';
     input.focus();
     renderHome();
+  }
+
+  /* ----------------------------- guided flow -------------------------------- */
+  const STEPS = ['persona', 'sector', 'goal', 'region', 'details'];
+
+  function renderGuided(step) {
+    const g = suggestions?.guided;
+    if (!g) return;
+    if (step === 0) profile = {};
+    const n = STEPS.length;
+    const header = (title) => `
+      <button class="acii-back">${I.back} ${step === 0 ? 'Back' : 'Previous'}</button>
+      <div class="acii-progress">
+        ${STEPS.map((_, i) => `<i class="${i < step ? 'acii-done' : ''}${i === step ? 'acii-now' : ''}"></i>`).join('')}
+        <span>Step ${step + 1} of ${n}</span>
+      </div>
+      <div class="acii-steplabel">${title}</div>`;
+    const pick = (cls, value, next) => (el) => {
+      el.classList.add('acii-picked');
+      Object.assign(profile, value);
+      setTimeout(() => renderGuided(next), 220); // brief feedback, then advance
+    };
+
+    let html = '';
+    if (step === 0) {
+      html = `${header('Step 1 · Who are you?')}
+        <div class="acii-personas">
+          ${g.personas.map((p) => `
+            <button class="acii-persona" data-id="${esc(p.id)}" data-label="${esc(p.label)}">
+              <span class="acii-picon">${I[p.icon] || I.building}</span>
+              <span>${esc(p.label)}</span>
+            </button>`).join('')}
+        </div>`;
+    } else if (step === 1) {
+      html = `${header('Step 2 · Which sector do you belong to?')}
+        <div class="acii-chips acii-chips-tight">
+          ${g.sectors.map((s) => `<button class="acii-chip" data-v="${esc(s)}">${esc(s)}</button>`).join('')}
+        </div>`;
+    } else if (step === 2) {
+      html = `${header('Step 3 · What is your goal?')}
+        <div class="acii-chips">
+          ${g.goals.map((s) => `<button class="acii-chip acii-chip-lg" data-v="${esc(s)}">${esc(s)}</button>`).join('')}
+        </div>`;
+    } else if (step === 3) {
+      html = `${header('Step 4 · Which region are you in?')}
+        <div class="acii-chips">
+          ${g.regions.map((s) => `<button class="acii-chip acii-chip-lg" data-v="${esc(s)}">${esc(s)}</button>`).join('')}
+        </div>`;
+    } else {
+      html = `${header('Step 5 · Almost there')}
+        <div class="acii-field">
+          <label>Company / organisation <span>(optional)</span></label>
+          <input type="text" class="acii-text acii-company" placeholder="e.g. Acme Industries Pvt Ltd" />
+        </div>
+        <div class="acii-field">
+          <label>Anything specific you need help with? <span>(optional)</span></label>
+          <textarea class="acii-text acii-help" rows="3" placeholder="e.g. finding export partners in the EU, green certification for our plant…"></textarea>
+        </div>
+        <div class="acii-actions" style="border-top:0;padding-top:6px">
+          <button class="acii-btn acii-btn-primary acii-shimmer acii-gosubmit">${I.spark} Show my pathway</button>
+        </div>`;
+    }
+
+    const body = setBody(html);
+    body.querySelector('.acii-back').addEventListener('click', () => (step === 0 ? renderHome() : renderGuided(step - 1)));
+    body.querySelectorAll('.acii-persona').forEach((el) =>
+      el.addEventListener('click', () => pick('persona', { persona: el.dataset.label }, 1)(el)));
+    body.querySelectorAll('.acii-chip').forEach((el) =>
+      el.addEventListener('click', () => {
+        const val = el.dataset.v;
+        if (step === 1) pick('chip', { sector: val }, 2)(el);
+        else if (step === 2) pick('chip', { goal: val }, 3)(el);
+        else if (step === 3) pick('chip', { region: val }, 4)(el);
+      }));
+    body.querySelector('.acii-gosubmit')?.addEventListener('click', () => {
+      profile.company = body.querySelector('.acii-company').value.trim();
+      profile.help = body.querySelector('.acii-help').value.trim();
+      runGuided();
+    });
+  }
+
+  async function runGuided() {
+    if (busy) return;
+    busy = true;
+    const q =
+      `I am a ${profile.persona || 'visitor'} in the ${profile.sector || 'general'} sector, based in ${profile.region || 'India'}. ` +
+      `My goal: ${profile.goal || 'engaging with CII'}.` +
+      (profile.company ? ` Company: ${profile.company}.` : '') +
+      (profile.help ? ` Specific help needed: ${profile.help}.` : '') +
+      ` Based on this profile, recommend the most relevant CII services, memberships, events, Centres of Excellence and programmes for me, with concrete next steps.`;
+    const input = $('.acii-input');
+    input.value = 'My personalised CII pathway';
+    renderThinking('Building your personalised pathway…');
+    try {
+      const res = await fetch(`${ENDPOINT}/api/ask`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ question: q, guided: true }),
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) throw new Error(data.error || `Request failed (${res.status})`);
+      renderAnswer(q, data, { pathway: true });
+    } catch (e) {
+      renderError(`Couldn't build your pathway: ${e.message}. Please try again.`);
+    } finally {
+      busy = false;
+    }
   }
 
   /* --------------------------------- ask ------------------------------------ */
@@ -231,7 +373,7 @@
     open();
     const input = $('.acii-input');
     input.value = q;
-    renderThinking(q);
+    renderThinking();
     try {
       const res = await fetch(`${ENDPOINT}/api/ask`, {
         method: 'POST',
@@ -251,6 +393,11 @@
   /* -------------------------------- voice ----------------------------------- */
   const MAX_RECORD_MS = 45000;
   let recCleanup = null; // stops waveform/timer/audio-context for the session
+
+  /** Toggle the Apple-Intelligence-style glow on the modal while listening. */
+  function setListening(on) {
+    overlay?.querySelector('.acii-modal')?.classList.toggle('acii-listening', on);
+  }
 
   async function toggleRecording() {
     const micBtn = $('.acii-mic');
@@ -274,6 +421,7 @@
       micBtn.classList.remove('acii-rec');
       micBtn.innerHTML = I.mic;
       micBtn.title = 'Ask by voice';
+      setListening(false);
       recCleanup?.();
       stream.getTracks().forEach((t) => t.stop());
       const blob = new Blob(recChunks, { type: recorder.mimeType || 'audio/webm' });
@@ -281,7 +429,7 @@
       input.placeholder = suggestions?.placeholder || 'Ask CII anything — or search sectors, reports, offices, people...';
       if (recCancelled) { recCancelled = false; renderHome(); return; }
       if (blob.size < 2000) { renderHome(); return; } // too short to be speech
-      renderThinking('', 'Heard you! Transcribing your question…');
+      renderThinking('Heard you! Transcribing your question…');
       try {
         const form = new FormData();
         form.append('audio', blob, 'question.webm');
@@ -300,31 +448,35 @@
     const input = $('.acii-input');
     input.value = '';
     input.placeholder = 'Listening…';
+    setListening(true);
     showListeningPanel(stream);
   }
 
-  /** Full-body listening view: live waveform, timer, explicit Done / Cancel. */
+  /** Siri-style listening view: gradient orb reacting to your voice. */
   function showListeningPanel(stream) {
-    const body = $('.acii-body');
-    body.innerHTML = `
+    const body = setBody(`
       <div class="acii-voice-panel">
-        <div class="acii-voice-mic">${I.mic}</div>
+        <div class="acii-orbwrap">
+          <span class="acii-orb acii-orb-lg"></span>
+          <span class="acii-orb-mic">${I.mic}</span>
+        </div>
         <div class="acii-voice-status">Listening — speak your question</div>
         <div class="acii-voice-langs">English &nbsp;·&nbsp; हिंदी &nbsp;·&nbsp; Hinglish &nbsp;·&nbsp; ਪੰਜਾਬੀ</div>
-        <canvas class="acii-wave" width="360" height="52" aria-hidden="true"></canvas>
+        <canvas class="acii-wave" width="360" height="44" aria-hidden="true"></canvas>
         <div class="acii-voice-timer">0:00</div>
         <div class="acii-voice-btns">
-          <button class="acii-btn acii-btn-primary acii-voice-done">Done — get my answer</button>
+          <button class="acii-btn acii-btn-primary acii-shimmer acii-voice-done">Done — get my answer</button>
           <button class="acii-btn acii-btn-secondary acii-voice-cancel">Cancel</button>
         </div>
-      </div>`;
+      </div>`);
     body.querySelector('.acii-voice-done').addEventListener('click', () => recorder?.state === 'recording' && recorder.stop());
     body.querySelector('.acii-voice-cancel').addEventListener('click', () => {
       if (recorder?.state === 'recording') { recCancelled = true; recorder.stop(); }
     });
 
-    // Live waveform from the mic stream — visible proof that we're hearing you.
+    // Drive the orb + gradient waveform from the live mic level.
     const canvas = body.querySelector('.acii-wave');
+    const orb = body.querySelector('.acii-orb-lg');
     const cx = canvas.getContext('2d');
     let actx = null, raf = 0;
     try {
@@ -333,21 +485,28 @@
       analyser.fftSize = 128;
       actx.createMediaStreamSource(stream).connect(analyser);
       const bins = new Uint8Array(analyser.frequencyBinCount);
+      const grad = cx.createLinearGradient(0, 0, canvas.width, 0);
+      grad.addColorStop(0, '#ff5f6d'); grad.addColorStop(0.35, '#a18cd1');
+      grad.addColorStop(0.7, '#5b9df9'); grad.addColorStop(1, '#43d8c9');
       const draw = () => {
         analyser.getByteFrequencyData(bins);
+        let sum = 0;
         cx.clearRect(0, 0, canvas.width, canvas.height);
         const bar = canvas.width / bins.length;
         for (let i = 0; i < bins.length; i++) {
+          sum += bins[i];
           const h = Math.max(3, (bins[i] / 255) * canvas.height);
-          cx.fillStyle = '#2b48c7';
-          cx.globalAlpha = 0.35 + 0.65 * (bins[i] / 255);
+          cx.fillStyle = grad;
+          cx.globalAlpha = 0.4 + 0.6 * (bins[i] / 255);
           cx.fillRect(i * bar + 1, (canvas.height - h) / 2, bar - 2, h);
         }
         cx.globalAlpha = 1;
+        const level = sum / bins.length / 255; // 0..1 speaking loudness
+        if (orb) orb.style.transform = `scale(${1 + level * 0.35})`;
         raf = requestAnimationFrame(draw);
       };
       draw();
-    } catch { /* waveform is progressive enhancement */ }
+    } catch { /* orb + waveform are progressive enhancement */ }
 
     const t0 = Date.now();
     const timerEl = body.querySelector('.acii-voice-timer');
@@ -386,15 +545,18 @@
       audioEl.onended = audioEl.onpause = () => {
         btn.innerHTML = `${I.speaker} <span>Listen to this answer</span>`;
         btn.disabled = false;
+        btn.classList.remove('acii-speaking');
       };
       // Flip the button before play() — on some devices/policies the promise
       // settles late or rejects, and the label must never stick on "Preparing".
       btn.disabled = false;
       btn.innerHTML = `${I.pause} <span>Stop audio</span>`;
+      btn.classList.add('acii-speaking');
       await audioEl.play();
     } catch {
       btn.disabled = false;
       btn.innerHTML = `${I.speaker} <span>Listen to this answer</span>`;
+      btn.classList.remove('acii-speaking');
     }
   }
 
@@ -416,6 +578,7 @@
   function close() {
     if (!overlay) return;
     stopAudio();
+    clearInterval(thinkTimer);
     if (recorder?.state === 'recording') { recCancelled = true; recorder.stop(); }
     overlay.classList.remove('acii-open');
     setTimeout(() => { if (overlay) overlay.style.display = 'none'; }, 180);
@@ -448,5 +611,5 @@
     try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; }
   }
 
-  window.AskCII = { open, close, ask: (q) => ask(q) };
+  window.AskCII = { open, close, ask: (q) => ask(q), guide: () => { open(); renderGuided(0); } };
 })();

@@ -1,34 +1,42 @@
 {
   "placeholder": "Ask CII anything — or search sectors, reports, offices, people...",
-  "tryAsking": [
+  "questions": [
     "How do I become a member?",
-    "Renewable energy sector",
-    "CII office in Tamil Nadu",
-    "Latest economy report"
-  ],
-  "commonQuestions": [
-    "How can I become a CII member?",
     "What are the upcoming CII events?",
-    "How do I register for a CII conference?",
-    "Where are CII's regional offices?",
+    "Latest economy report",
+    "CII office in Tamil Nadu",
     "What does CII do for MSMEs?",
-    "How can I access CII publications and reports?"
+    "Renewable energy sector",
+    "How do I register for a CII conference?",
+    "What are the CII Centres of Excellence?"
   ],
-  "quickActions": [
-    {
-      "title": "Become a member",
-      "subtitle": "Membership in 4 steps",
-      "url": "https://www.cii.in/how_to_become_a_member.aspx?gid=M"
-    },
-    {
-      "title": "Find a regional office",
-      "subtitle": "Offices across India",
-      "url": "https://www.cii.in/Contact_Us.aspx?gid=C"
-    },
-    {
-      "title": "Media contact",
-      "subtitle": "For press & journalists",
-      "url": "https://www.cii.in/NewsRoom.aspx?gid=N"
-    }
-  ]
+  "guided": {
+    "title": "Get my personalised pathway",
+    "subtitle": "Tell us who you are — we'll show the most relevant forums, research and partnerships.",
+    "personas": [
+      { "id": "corporate", "label": "Corporate Leader", "icon": "building" },
+      { "id": "msme", "label": "Entrepreneur / MSME", "icon": "chart" },
+      { "id": "startup", "label": "Startup Founder", "icon": "rocket" },
+      { "id": "govt", "label": "Government / Policy", "icon": "people" },
+      { "id": "academic", "label": "Academic / Researcher", "icon": "cap" },
+      { "id": "association", "label": "Sectoral Association", "icon": "org" },
+      { "id": "global", "label": "Global Partner / Investor", "icon": "globe" },
+      { "id": "community", "label": "Community / Civil Society", "icon": "heart" }
+    ],
+    "sectors": [
+      "Agriculture & Food Processing", "Automotive & Mobility", "Defence & Aerospace",
+      "Energy & Renewables", "Financial Services", "Healthcare & Pharma",
+      "Infrastructure & Construction", "IT & Electronics", "Manufacturing & Engineering",
+      "Retail & FMCG", "Textiles & Apparel", "Tourism & Hospitality", "Other / Multi-sector"
+    ],
+    "goals": [
+      "Manufacturing & Competitiveness", "Sustainability & Climate Action",
+      "AI & Digital Transformation", "Global Trade & Investment",
+      "Skills & Employment", "Policy & Advocacy"
+    ],
+    "regions": [
+      "Northern India", "Southern India", "Eastern India", "Western India",
+      "North-East India", "Pan-India / Global"
+    ]
+  }
 }
