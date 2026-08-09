@@ -560,11 +560,77 @@ const OPENAI_VOICES = [
   { id: 'verse', description: 'Versatile, conversational male' },
 ];
 
+/**
+ * Smallest.ai (Waves Lightning) — Indian-language TTS used for Hindi,
+ * Hinglish and Punjabi answers when SMALLEST_API_KEY is configured.
+ * Long answers are split into ~240-char sentence chunks (the API's
+ * recommended max), synthesized in parallel as raw PCM, and stitched
+ * under a single WAV header.
+ */
+async function smallestTts(env, text, langCode) {
+  const chunks = [];
+  let buf = '';
+  for (const part of text.split(/(?<=[.!?।])\s+/)) {
+    if ((buf + ' ' + part).trim().length > 240 && buf) { chunks.push(buf.trim()); buf = part; }
+    else buf = `${buf} ${part}`;
+  }
+  if (buf.trim()) chunks.push(buf.trim());
+
+  const sampleRate = 24000;
+  const pcms = await Promise.all(chunks.slice(0, 10).map(async (chunk) => {
+    const res = await fetch('https://api.smallest.ai/waves/v1/tts', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${env.SMALLEST_API_KEY}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        text: chunk,
+        voice_id: env.SMALLEST_VOICE_ID || 'meher',
+        model: env.SMALLEST_MODEL || 'lightning_v3.1_pro',
+        sample_rate: sampleRate,
+        speed: 1.0,
+        language: langCode,
+        output_format: 'pcm',
+      }),
+      signal: AbortSignal.timeout(45000),
+    });
+    if (!res.ok) throw new Error(`smallest.ai ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    return new Uint8Array(await res.arrayBuffer());
+  }));
+
+  const dataLen = pcms.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(44 + dataLen);
+  const dv = new DataView(out.buffer);
+  const wstr = (off, s) => { for (let i = 0; i < s.length; i++) out[off + i] = s.charCodeAt(i); };
+  wstr(0, 'RIFF'); dv.setUint32(4, 36 + dataLen, true); wstr(8, 'WAVE');
+  wstr(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, sampleRate, true); dv.setUint32(28, sampleRate * 2, true);
+  dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  wstr(36, 'data'); dv.setUint32(40, dataLen, true);
+  let off = 44;
+  for (const p of pcms) { out.set(p, off); off += p.length; }
+  return out;
+}
+
 async function handleTts(request, env, ctx) {
   const t0 = Date.now();
   const body = await request.json().catch(() => ({}));
   const input = (body.text || '').trim().slice(0, 1600);
   if (!input) return json({ error: 'Missing "text".' }, 400);
+
+  // Indian-language answers use Smallest.ai's Lightning voices when a key is
+  // configured; anything else (or any Smallest failure) uses OpenAI TTS.
+  const ln = (body.langName || '').toLowerCase();
+  const smallestLang = /hindi|hinglish/.test(ln) ? 'hi' : /punjabi/.test(ln) ? 'pa' : null;
+  if (env.SMALLEST_API_KEY && smallestLang) {
+    try {
+      const wav = await smallestTts(env, input, smallestLang);
+      logEvent(env, ctx, { type: 'tts', mode: 'voice', lang: `${body.langName} (smallest.ai)`, latency_ms: Date.now() - t0 });
+      return new Response(wav, {
+        headers: { 'content-type': 'audio/wav', 'cache-control': 'no-store', ...CORS },
+      });
+    } catch (e) {
+      console.warn('smallest.ai TTS failed, falling back to OpenAI:', e.message);
+    }
+  }
 
   // Voice priority: admin preview override > saved setting (D1) > env var.
   let voice = (await getSetting(env, 'tts_voice')) || env.OPENAI_TTS_VOICE || 'coral';

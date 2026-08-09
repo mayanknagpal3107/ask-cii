@@ -162,6 +162,8 @@ or link instead:
 | | `OPENAI_TTS_MODEL` | `gpt-4o-mini-tts` | text→speech with steerable Indian-language delivery |
 | | `OPENAI_TTS_VOICE` | `coral` | TTS voice |
 | | `OPENAI_EMBED_MODEL` / `OPENAI_EMBED_DIMS` | `text-embedding-3-small` / `256` | retrieval embeddings |
+| secret | `SMALLEST_API_KEY` | — | optional: Smallest.ai Waves Lightning speaks Hindi/Hinglish/Punjabi answers (native Indian voices); OpenAI remains the fallback |
+| `wrangler.jsonc` vars | `SMALLEST_VOICE_ID` / `SMALLEST_MODEL` | `meher` / `lightning_v3.1_pro` | Smallest.ai voice + model |
 
 The home-screen content (Try asking chips, Common questions, Quick actions,
 input placeholder) is editable in `public/data/suggestions.json`.

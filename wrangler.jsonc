@@ -31,6 +31,11 @@
     "OPENAI_TTS_MODEL": "gpt-4o-mini-tts",
     "OPENAI_TTS_VOICE": "coral",
     "OPENAI_EMBED_MODEL": "text-embedding-3-small",
-    "OPENAI_EMBED_DIMS": "256"
+    "OPENAI_EMBED_DIMS": "256",
+    // Smallest.ai (Waves Lightning) speaks Hindi/Hinglish/Punjabi answers
+    // when the SMALLEST_API_KEY secret is set (wrangler secret put
+    // SMALLEST_API_KEY); other languages and failures use OpenAI TTS.
+    "SMALLEST_VOICE_ID": "meher",
+    "SMALLEST_MODEL": "lightning_v3.1_pro"
   }
 }
