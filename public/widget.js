@@ -31,6 +31,7 @@
     speaker: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6.5 9H3v6h3.5L11 19zM15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13"/></svg>',
     pause: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
     enter: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-2px"><path d="M20 5v6a3 3 0 01-3 3H5M9 10l-4 4 4 4"/></svg>',
+    arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 5l7 7-7 7"/></svg>',
     // guided-flow persona icons
     building: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1.5"/><path d="M9 7h2M13 7h2M9 11h2M13 11h2M9 15h2M13 15h2M10.5 21v-3h3v3"/></svg>',
     chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 19h16M5 15l4-4 3 3 6-6"/><path d="M14 8h4v4"/></svg>',
@@ -75,8 +76,12 @@
       <div class="acii-modal" role="dialog" aria-modal="true" aria-label="Ask CII">
         <div class="acii-head">
           <span class="acii-spark">${I.spark}</span>
-          <input class="acii-input" type="text" autocomplete="off" spellcheck="false"
-                 placeholder="Ask CII anything — or search sectors, reports, offices, people..." aria-label="Ask CII" />
+          <form class="acii-form" action="#">
+            <input class="acii-input" type="search" autocomplete="off" spellcheck="false"
+                   autocapitalize="off" autocorrect="off" enterkeyhint="search"
+                   placeholder="Ask CII anything — or search sectors, reports, offices, people..." aria-label="Ask CII" />
+          </form>
+          <button class="acii-iconbtn acii-go" title="Ask" aria-label="Ask" hidden>${I.arrow}</button>
           <button class="acii-iconbtn acii-mic" title="Ask by voice" aria-label="Ask by voice">${I.mic}</button>
           <button class="acii-iconbtn acii-close" title="Close" aria-label="Close">${I.x}</button>
         </div>
@@ -96,9 +101,15 @@
     $('.acii-close').addEventListener('click', close);
     $('.acii-mic').addEventListener('click', toggleRecording);
     const input = $('.acii-input');
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && input.value.trim()) ask(input.value.trim());
+    // A real <form> makes mobile keyboards show "search/go" and submit
+    // reliably (some Android IMEs never emit a usable Enter keydown).
+    $('.acii-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (input.value.trim()) { input.blur(); ask(input.value.trim()); }
     });
+    const goBtn = $('.acii-go');
+    goBtn.addEventListener('click', () => { if (input.value.trim()) ask(input.value.trim()); });
+    input.addEventListener('input', () => { goBtn.hidden = !input.value.trim(); });
     loadSuggestions();
   }
 
@@ -260,6 +271,7 @@
     clearInterval(thinkTimer);
     const input = $('.acii-input');
     input.value = '';
+    $('.acii-go').hidden = true;
     input.focus();
     renderHome();
   }

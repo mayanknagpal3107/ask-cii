@@ -63,8 +63,11 @@
   flex: none;
 }
 .acii-spark { color: #2b48c7; flex: none; width: 22px; height: 22px; }
+.acii-overlay [hidden] { display: none !important; }
+.acii-form { flex: 1; min-width: 0; display: flex; }
 .acii-input {
   flex: 1;
+  width: 100%;
   border: 0;
   outline: 0;
   font: inherit;
@@ -72,8 +75,14 @@
   color: #10182b;
   background: transparent;
   min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
 }
 .acii-input::placeholder { color: #9aa3b5; }
+.acii-input::-webkit-search-decoration,
+.acii-input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.acii-go { background: #1e3fae !important; color: #fff !important; }
+.acii-go:hover { filter: brightness(1.1); }
 .acii-iconbtn {
   flex: none;
   width: 40px;

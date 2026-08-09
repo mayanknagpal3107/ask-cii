@@ -240,6 +240,26 @@ await page.keyboard.press('Escape');
 await page.waitForTimeout(400);
 ok('esc closes popup', !(await page.locator('.acii-overlay.acii-open').count()));
 
+/* 13. mobile: search works on a phone-sized touch browser */
+const mctx = await browser.newContext({
+  viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+  userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+});
+const mp = await mctx.newPage();
+await mp.goto(BASE + '/', { waitUntil: 'networkidle' });
+await mp.tap('.acii-launcher');
+await mp.waitForSelector('.acii-overlay.acii-open', { timeout: 5000 });
+await mp.waitForSelector('.acii-qrow', { timeout: 15000 });
+ok('mobile: popup opens full-screen', true);
+await mp.fill('.acii-input', 'How do I become a member?');
+ok('mobile: go button appears while typing', await mp.locator('.acii-go:not([hidden])').count() === 1);
+await mp.tap('.acii-go');
+await mp.waitForSelector('.acii-summary', { timeout: 90000 });
+ok('mobile: search returns an answer', (await mp.locator('.acii-summary').innerText()).length > 40);
+await mp.waitForTimeout(600);
+await mp.screenshot({ path: `${SCRATCH}/e2e-mobile.png` });
+await mctx.close();
+
 await browser.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
