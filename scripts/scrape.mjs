@@ -281,6 +281,9 @@ async function main() {
     process.stdout.write(`[${pages.length + 1}/${MAX_PAGES}] ${url}\n`);
     try {
       const resp = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      // JS-rendered pages (e.g. cam.mycii.in event details) fill in via XHR
+      // after DOMContentLoaded — let the network settle before extracting.
+      await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
       let data = await extractPage(page).catch(() => null); // challenge may navigate mid-read
       // Incapsula serves a challenge page first; give its JS time to set
       // cookies and re-navigate, then re-read.
