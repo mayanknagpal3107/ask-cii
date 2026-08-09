@@ -235,16 +235,21 @@
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.12s ease;
 }
 .acii-chip:hover { border-color: #2b48c7; background: #f4f6ff; transform: translateY(-1px); }
-.acii-chips-tight .acii-chip { font-size: 13.5px; padding: 8px 14px; }
-.acii-chip-lg { font-size: 14px; padding: 12px 20px; letter-spacing: 0.03em; text-transform: uppercase; font-weight: 500; }
+.acii-chips-tight .acii-chip { font-size: 14.5px; padding: 12px 20px; }
+.acii-chip-lg { font-size: 14.5px; padding: 15px 24px; letter-spacing: 0.03em; text-transform: uppercase; font-weight: 500; }
+.acii-roomy .acii-chips { gap: 12px; }
 .acii-chip.acii-picked { background: #1e3fae; border-color: #1e3fae; color: #fff; transform: scale(0.97); }
 
-/* guided flow scaffolding */
+/* guided flow scaffolding — the "roomy" canvas keeps a steady, generous
+   size across steps so the experience feels calm, not jumpy. */
+.acii-modal.acii-roomy { max-width: 960px; transition: max-width 0.25s ease; }
+.acii-roomy .acii-body { min-height: min(520px, 62vh); padding: 6px 34px 30px; }
+
 .acii-progress {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 6px 0 4px;
+  margin: 10px 0 4px;
 }
 .acii-progress i {
   width: 22px; height: 4px;
@@ -256,30 +261,37 @@
 .acii-progress i.acii-now { background: linear-gradient(90deg, #ff5f6d, #a18cd1, #5b9df9); }
 .acii-progress span { margin-left: 8px; font-size: 12px; color: #98a1b3; }
 .acii-steplabel {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #6b7488;
-  margin: 18px 0 14px;
+  color: #4d5872;
+  margin: 26px 0 6px;
+}
+.acii-stephint {
+  font-size: 14.5px;
+  color: #8b94a7;
+  margin-bottom: 22px;
+  line-height: 1.6;
 }
 .acii-personas {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+  gap: 14px;
 }
 .acii-persona {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   border: 1px solid #e4e7ee;
-  border-radius: 12px;
+  border-radius: 14px;
   background: #fff;
-  padding: 14px;
+  padding: 20px 18px;
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: 0.05em;
+  line-height: 1.45;
   text-transform: uppercase;
   color: #26314e;
   text-align: left;
@@ -287,18 +299,18 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
 }
 .acii-persona:hover { border-color: #2b48c7; transform: translateY(-2px); box-shadow: 0 6px 18px rgba(43, 72, 199, 0.1); }
-.acii-persona.acii-picked { border: 2px solid #1e3fae; padding: 13px; }
+.acii-persona.acii-picked { border: 2px solid #1e3fae; padding: 19px 17px; }
 .acii-persona.acii-picked .acii-picon { background: #1e3fae; color: #fff; }
 .acii-picon {
   flex: none;
-  width: 40px; height: 40px;
+  width: 48px; height: 48px;
   border-radius: 50%;
   background: #eef0f6;
   color: #45506b;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.15s ease, color 0.15s ease;
 }
-.acii-picon svg { width: 20px; height: 20px; }
+.acii-picon svg { width: 23px; height: 23px; }
 
 .acii-field { margin: 16px 0; }
 .acii-field label { display: block; font-size: 14px; font-weight: 600; color: #26314e; margin-bottom: 8px; }

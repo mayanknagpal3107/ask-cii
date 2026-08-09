@@ -103,7 +103,10 @@
   }
 
   /** Swap body content with a quick fade/rise transition. */
-  function setBody(html) {
+  function setBody(html, { roomy = false } = {}) {
+    // Guided steps get a wider, fixed-height canvas so the modal never jumps
+    // between steps and choices have space to breathe.
+    $('.acii-modal').classList.toggle('acii-roomy', roomy);
     const body = $('.acii-body');
     body.innerHTML = `<div class="acii-view">${html}</div>`;
     return body;
@@ -266,13 +269,14 @@
     if (!g) return;
     if (step === 0) profile = {};
     const n = STEPS.length;
-    const header = (title) => `
+    const header = (title, hint) => `
       <button class="acii-back">${I.back} ${step === 0 ? 'Back' : 'Previous'}</button>
       <div class="acii-progress">
         ${STEPS.map((_, i) => `<i class="${i < step ? 'acii-done' : ''}${i === step ? 'acii-now' : ''}"></i>`).join('')}
         <span>Step ${step + 1} of ${n}</span>
       </div>
-      <div class="acii-steplabel">${title}</div>`;
+      <div class="acii-steplabel">${title}</div>
+      ${hint ? `<div class="acii-stephint">${hint}</div>` : ''}`;
     const pick = (cls, value, next) => (el) => {
       el.classList.add('acii-picked');
       Object.assign(profile, value);
@@ -281,7 +285,7 @@
 
     let html = '';
     if (step === 0) {
-      html = `${header('Step 1 · Who are you?')}
+      html = `${header('Step 1 · Who are you?', 'Pick the option closest to you — one tap moves you forward.')}
         <div class="acii-personas">
           ${g.personas.map((p) => `
             <button class="acii-persona" data-id="${esc(p.id)}" data-label="${esc(p.label)}">
@@ -290,22 +294,22 @@
             </button>`).join('')}
         </div>`;
     } else if (step === 1) {
-      html = `${header('Step 2 · Which sector do you belong to?')}
+      html = `${header('Step 2 · Which sector do you belong to?', 'Choose the sector closest to your business.')}
         <div class="acii-chips acii-chips-tight">
           ${g.sectors.map((s) => `<button class="acii-chip" data-v="${esc(s)}">${esc(s)}</button>`).join('')}
         </div>`;
     } else if (step === 2) {
-      html = `${header('Step 3 · What is your goal?')}
+      html = `${header('Step 3 · What is your goal?', 'What would you most like CII to help you with?')}
         <div class="acii-chips">
           ${g.goals.map((s) => `<button class="acii-chip acii-chip-lg" data-v="${esc(s)}">${esc(s)}</button>`).join('')}
         </div>`;
     } else if (step === 3) {
-      html = `${header('Step 4 · Which region are you in?')}
+      html = `${header('Step 4 · Which region are you in?', 'So we can point you to the right offices and events.')}
         <div class="acii-chips">
           ${g.regions.map((s) => `<button class="acii-chip acii-chip-lg" data-v="${esc(s)}">${esc(s)}</button>`).join('')}
         </div>`;
     } else {
-      html = `${header('Step 5 · Almost there')}
+      html = `${header('Step 5 · Almost there', 'Both fields are optional — skip straight to your pathway if you like.')}
         <div class="acii-field">
           <label>Company / organisation <span>(optional)</span></label>
           <input type="text" class="acii-text acii-company" placeholder="e.g. Acme Industries Pvt Ltd" />
@@ -319,7 +323,7 @@
         </div>`;
     }
 
-    const body = setBody(html);
+    const body = setBody(html, { roomy: true });
     body.querySelector('.acii-back').addEventListener('click', () => (step === 0 ? renderHome() : renderGuided(step - 1)));
     body.querySelectorAll('.acii-persona').forEach((el) =>
       el.addEventListener('click', () => pick('persona', { persona: el.dataset.label }, 1)(el)));
