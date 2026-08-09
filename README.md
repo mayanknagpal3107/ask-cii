@@ -68,6 +68,48 @@ npx wrangler secret put OPENAI_API_KEY
 npm run deploy
 ```
 
+## Analytics & the admin panel
+
+Every question and answer (text **and** voice) can be recorded to a Cloudflare
+D1 database and browsed at **`/admin`** — recent Q&A (with English versions of
+non-English answers), top questions, language and voice/text breakdowns, and a
+**voice studio** to preview and switch the assistant's OpenAI voice actor.
+
+One-time setup:
+
+```bash
+npx wrangler d1 create ask-cii          # prints a database_id
+# → uncomment the d1_databases block in wrangler.jsonc and paste the id
+npx wrangler d1 execute ask-cii --remote --file=schema.sql
+npx wrangler secret put ADMIN_TOKEN     # choose a strong token for /admin
+npm run deploy
+```
+
+Then open `https://YOUR-WORKER.workers.dev/admin` and enter the token.
+Without this setup the bot still works — analytics are simply not recorded.
+
+Available voice actors (OpenAI Speech API): `alloy`, `ash`, `ballad`, `coral`
+(default), `echo`, `fable`, `nova`, `onyx`, `sage`, `shimmer`, `verse` — all
+previewable in the admin panel; the saved choice applies to every spoken
+answer immediately.
+
+## Focused crawls (events, reports, Centres of Excellence)
+
+The scraper accepts multiple seeds and extra hosts for section-focused crawls,
+and the index builder merges any number of scrape files:
+
+```bash
+node scripts/scrape.mjs \
+  --seed  "https://www.cii.in/Events.aspx" \
+  --seeds "https://www.cii.in/CII_Events.aspx,https://www.cii.in/publications.aspx,https://www.cii.in/Centres_of_Excellence.aspx" \
+  --max 260 --out data/pages-extra.json
+
+node scripts/build-index.mjs --in data/pages.json,data/pages-extra.json
+npm run deploy
+```
+
+Re-run this before big event seasons so "what's coming up" answers stay fresh.
+
 ## Embedding on a website
 
 One script tag anywhere on the site — the widget injects a floating
@@ -91,6 +133,25 @@ Programmatic control: `AskCII.open()`, `AskCII.close()`, `AskCII.ask("...")`.
 A full-page experience is available at the Worker root URL (`/`), which you
 can also link to directly instead of the popup.
 
+### Figma, Google Slides, and other places you can't run scripts
+
+Live JavaScript widgets only run on real web pages, so design/deck tools embed
+or link instead:
+
+- **Figma / FigJam / Figma Slides** — paste the Worker URL
+  (`https://YOUR-WORKER.workers.dev/`) as a link on any frame, button, or
+  prototype hotspot; presenters click through to the live bot. On **Figma
+  Sites**, add a *code embed* containing the one-line `<script>` tag and the
+  real widget runs on the published site.
+- **Google Slides** — Slides can't host live iframes. Link a button or
+  screenshot to the Worker URL (Insert → Link); during a presentation one
+  click opens the bot in a browser tab. Screenshots for the mock are in this
+  repo's test artifacts, or take your own from the live page.
+- **Anywhere with an iframe** (Notion, WordPress.com, SharePoint, kiosks):
+  `<iframe src="https://YOUR-WORKER.workers.dev/" style="width:100%;height:700px;border:0"></iframe>`
+  — the full-page experience works inside iframes; note the microphone
+  needs an `allow="microphone"` attribute on the iframe.
+
 ## Configuration
 
 | Where | Key | Default | Purpose |
@@ -109,11 +170,14 @@ input placeholder) is editable in `public/data/suggestions.json`.
 
 | Route | Body | Returns |
 |---|---|---|
-| `POST /api/ask` | `{"question": "..."}` | `{summary, lang, langName, link{label,url}, actions[], sources[{title,url,type,label}], confidence}` |
+| `POST /api/ask` | `{"question": "...", "voice": bool}` | `{summary, summaryEn (English version, null for English answers), lang, langName, link{label,url}, actions[], sources[{title,url,type,label}], confidence}` |
 | `POST /api/transcribe` | multipart `audio` file | `{text}` |
-| `POST /api/tts` | `{text, langName}` | `audio/mpeg` |
+| `POST /api/tts` | `{text, langName}` | `audio/mpeg` (voice = saved setting; admins may pass `voice` for previews) |
 | `GET /api/suggestions` | — | home-screen content |
 | `GET /api/health` | — | `{ok, hasKey}` |
+| `GET /api/admin/analytics?days=30` | header `x-admin-token` | totals, language/mode breakdowns, top questions, recent Q&A |
+| `GET /api/admin/voices` | header `x-admin-token` | all OpenAI voices + current selection |
+| `POST /api/admin/settings` | `{voice}` + token header | saves the TTS voice |
 
 All API routes send permissive CORS headers so the widget can be embedded on
 any origin.

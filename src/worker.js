@@ -30,9 +30,11 @@ export default {
     const url = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
     try {
-      if (url.pathname === '/api/ask' && request.method === 'POST') return await handleAsk(request, env);
+      if (url.pathname === '/api/ask' && request.method === 'POST') return await handleAsk(request, env, ctx);
       if (url.pathname === '/api/transcribe' && request.method === 'POST') return await handleTranscribe(request, env);
-      if (url.pathname === '/api/tts' && request.method === 'POST') return await handleTts(request, env);
+      if (url.pathname === '/api/tts' && request.method === 'POST') return await handleTts(request, env, ctx);
+      if (url.pathname.startsWith('/api/admin/')) return await handleAdmin(request, env, url);
+      if (url.pathname === '/admin') return env.ASSETS.fetch(new Request(new URL('/admin.html', url.origin)));
       if (url.pathname === '/api/suggestions') {
         const res = await env.ASSETS.fetch(new Request(new URL('/data/suggestions.json', url.origin)));
         return new Response(res.body, { status: res.status, headers: { 'content-type': 'application/json; charset=utf-8', ...CORS } });
@@ -226,10 +228,12 @@ async function chatJSON(env, messages, maxTokens = 700) {
 
 /* -------------------------------- /api/ask --------------------------------- */
 
-async function handleAsk(request, env) {
-  const { question } = await request.json().catch(() => ({}));
+async function handleAsk(request, env, ctx) {
+  const { question, voice } = await request.json().catch(() => ({}));
   const q = (question || '').trim().slice(0, 600);
   if (!q) return json({ error: 'Missing "question".' }, 400);
+  const mode = voice ? 'voice' : 'text';
+  const t0 = Date.now();
 
   const origin = new URL(request.url).origin;
   const store = await loadIndex(env, origin);
@@ -294,11 +298,12 @@ async function handleAsk(request, env) {
         `1. Answer ONLY from the numbered context blocks. If they do not contain the answer, say so honestly and point to the closest relevant page.\n` +
         `2. Write the summary in ${langName} — the same language and script the user asked in. For Hinglish, write Hindi in Latin script. Never switch to another language.\n` +
         '3. Keep the summary to 2–4 short sentences, factual and helpful. No markdown.\n' +
-        '4. "link" is the single best page for the user to open next (must be a URL from the context). Its "label" is a short call-to-action in the user\'s language.\n' +
-        '5. "actions": up to 2 buttons {label, url} for the most useful next steps (e.g. start a membership request, contact an office). URLs must come from the context. Labels in the user\'s language.\n' +
-        '6. "sources": array of context numbers (integers) you actually used, most relevant first, max 3.\n' +
-        '7. "confidence": "high" | "medium" | "low" — how well the context answers the question.\n' +
-        'Return strict JSON: {"summary": string, "link": {"label": string, "url": string}, "actions": [{"label","url"}], "sources": [int], "confidence": string}',
+        '4. "summaryEn": the same summary translated to natural English — REQUIRED whenever the answer language is not English; exactly null when the summary is already English.\n' +
+        '5. "link" is the single best page for the user to open next (must be a URL from the context). Its "label" is a short call-to-action in the user\'s language.\n' +
+        '6. "actions": up to 2 buttons {label, url} for the most useful next steps (e.g. start a membership request, contact an office). URLs must come from the context. Labels in the user\'s language.\n' +
+        '7. "sources": array of context numbers (integers) you actually used, most relevant first, max 3.\n' +
+        '8. "confidence": "high" | "medium" | "low" — how well the context answers the question.\n' +
+        'Return strict JSON: {"summary": string, "summaryEn": string|null, "link": {"label": string, "url": string}, "actions": [{"label","url"}], "sources": [int], "confidence": string}',
     },
     { role: 'user', content: `Question (${langName}): ${q}\n\nContext:\n${contextBlock}` },
   ], 700).catch(() => ({
@@ -326,8 +331,14 @@ async function handleAsk(request, env) {
     }
   }
 
-  return json({
-    summary: String(answer.summary || '').slice(0, 1200),
+  const summary = String(answer.summary || '').slice(0, 1200);
+  // English companion answer — only when the reply itself isn't English.
+  const summaryEn = lang !== 'en' && answer.summaryEn && String(answer.summaryEn).trim()
+    ? String(answer.summaryEn).slice(0, 1200)
+    : null;
+  const payload = {
+    summary,
+    summaryEn,
     lang,
     langName,
     link: {
@@ -340,7 +351,19 @@ async function handleAsk(request, env) {
     })),
     sources: sources.slice(0, 3),
     confidence: ['high', 'medium', 'low'].includes(answer.confidence) ? answer.confidence : 'medium',
+  };
+  logEvent(env, ctx, {
+    type: 'ask',
+    mode,
+    lang,
+    question: q,
+    summary,
+    summary_en: summaryEn || (lang === 'en' ? summary : null),
+    link: payload.link.url,
+    confidence: payload.confidence,
+    latency_ms: Date.now() - t0,
   });
+  return json(payload);
 }
 
 function labelForUrl(u) {
@@ -423,23 +446,133 @@ async function handleTranscribe(request, env) {
 
 /* -------------------------------- /api/tts --------------------------------- */
 
-async function handleTts(request, env) {
-  const { text, langName } = await request.json().catch(() => ({}));
-  const input = (text || '').trim().slice(0, 1600);
+/** Every voice the OpenAI Speech API offers for gpt-4o-mini-tts / tts-1. */
+const OPENAI_VOICES = [
+  { id: 'alloy', description: 'Neutral and balanced — safe all-rounder' },
+  { id: 'ash', description: 'Warm, engaging male' },
+  { id: 'ballad', description: 'Expressive, melodic male' },
+  { id: 'coral', description: 'Warm, friendly female (default)' },
+  { id: 'echo', description: 'Clear, articulate male' },
+  { id: 'fable', description: 'Storyteller style, British-leaning' },
+  { id: 'nova', description: 'Bright, energetic female' },
+  { id: 'onyx', description: 'Deep, authoritative male' },
+  { id: 'sage', description: 'Calm, measured female' },
+  { id: 'shimmer', description: 'Light, upbeat female' },
+  { id: 'verse', description: 'Versatile, conversational male' },
+];
+
+async function handleTts(request, env, ctx) {
+  const t0 = Date.now();
+  const body = await request.json().catch(() => ({}));
+  const input = (body.text || '').trim().slice(0, 1600);
   if (!input) return json({ error: 'Missing "text".' }, 400);
+
+  // Voice priority: admin preview override > saved setting (D1) > env var.
+  let voice = (await getSetting(env, 'tts_voice')) || env.OPENAI_TTS_VOICE || 'coral';
+  if (body.voice && isAdmin(request, env) && OPENAI_VOICES.some((v) => v.id === body.voice)) {
+    voice = body.voice;
+  }
 
   const res = await openai(env, '/v1/audio/speech', {
     model: env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts',
-    voice: env.OPENAI_TTS_VOICE || 'coral',
+    voice,
     input,
     instructions:
       `Speak naturally and clearly, like a helpful Indian assistant. ` +
-      `The text is in ${langName || 'English'}; pronounce it with the appropriate accent for that language ` +
+      `The text is in ${body.langName || 'English'}; pronounce it with the appropriate accent for that language ` +
       `(Indian English, Hindi, Hinglish, or Punjabi). Keep a warm, professional tone at a moderate pace.`,
     response_format: 'mp3',
   }, { raw: true, timeoutMs: 90000 });
 
+  logEvent(env, ctx, { type: 'tts', mode: 'voice', lang: body.langName || null, latency_ms: Date.now() - t0 });
   return new Response(res.body, {
     headers: { 'content-type': 'audio/mpeg', 'cache-control': 'no-store', ...CORS },
   });
+}
+
+/* --------------------------- analytics & settings --------------------------- */
+/**
+ * Analytics live in a D1 database (binding: DB) — optional. Without the
+ * binding the bot works normally and logging is a silent no-op. Setup:
+ *   npx wrangler d1 create ask-cii
+ *   (paste database_id into the d1_databases block in wrangler.jsonc)
+ *   npx wrangler d1 execute ask-cii --remote --file=schema.sql
+ */
+function logEvent(env, ctx, e) {
+  if (!env.DB) return;
+  const run = env.DB.prepare(
+    'INSERT INTO events (type, mode, lang, question, summary, summary_en, link, confidence, latency_ms) VALUES (?,?,?,?,?,?,?,?,?)'
+  ).bind(
+    e.type, e.mode || null, e.lang || null,
+    (e.question || '').slice(0, 500) || null,
+    (e.summary || '').slice(0, 800) || null,
+    (e.summary_en || '').slice(0, 800) || null,
+    e.link || null, e.confidence || null, e.latency_ms ?? null
+  ).run().catch((err) => console.warn('analytics insert failed:', err.message));
+  ctx?.waitUntil?.(run);
+}
+
+let settingsCache = { at: 0, values: {} };
+async function getSetting(env, key) {
+  if (!env.DB) return null;
+  if (Date.now() - settingsCache.at > 30000) {
+    try {
+      const { results } = await env.DB.prepare('SELECT key, value FROM settings').all();
+      settingsCache = { at: Date.now(), values: Object.fromEntries(results.map((r) => [r.key, r.value])) };
+    } catch {
+      settingsCache = { at: Date.now(), values: {} };
+    }
+  }
+  return settingsCache.values[key] ?? null;
+}
+
+function isAdmin(request, env) {
+  if (!env.ADMIN_TOKEN) return false;
+  const token = request.headers.get('x-admin-token') || new URL(request.url).searchParams.get('token');
+  return token === env.ADMIN_TOKEN;
+}
+
+async function handleAdmin(request, env, url) {
+  if (!env.ADMIN_TOKEN) {
+    return json({ error: 'Admin is not configured. Set a token with: npx wrangler secret put ADMIN_TOKEN' }, 501);
+  }
+  if (!isAdmin(request, env)) return json({ error: 'Invalid admin token.' }, 401);
+
+  if (url.pathname === '/api/admin/voices') {
+    const current = (await getSetting(env, 'tts_voice')) || env.OPENAI_TTS_VOICE || 'coral';
+    return json({ voices: OPENAI_VOICES, current, model: env.OPENAI_TTS_MODEL || 'gpt-4o-mini-tts' });
+  }
+
+  if (url.pathname === '/api/admin/settings' && request.method === 'POST') {
+    if (!env.DB) return json({ error: 'D1 database not configured — see README (Analytics setup).' }, 501);
+    const { voice } = await request.json().catch(() => ({}));
+    if (!OPENAI_VOICES.some((v) => v.id === voice)) return json({ error: `Unknown voice "${voice}".` }, 400);
+    await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('tts_voice', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(voice).run();
+    settingsCache = { at: 0, values: {} };
+    return json({ ok: true, voice });
+  }
+
+  if (url.pathname === '/api/admin/analytics') {
+    if (!env.DB) return json({ configured: false });
+    const days = Math.min(Number(url.searchParams.get('days') || 30), 365);
+    const since = `-${days} days`;
+    const [recent, byLang, byMode, top, totals] = await Promise.all([
+      env.DB.prepare("SELECT ts, mode, lang, question, summary, summary_en, link, confidence, latency_ms FROM events WHERE type='ask' ORDER BY id DESC LIMIT 100").all(),
+      env.DB.prepare("SELECT lang, COUNT(*) n FROM events WHERE type='ask' AND ts > datetime('now', ?) GROUP BY lang ORDER BY n DESC").bind(since).all(),
+      env.DB.prepare("SELECT mode, COUNT(*) n FROM events WHERE type='ask' AND ts > datetime('now', ?) GROUP BY mode").bind(since).all(),
+      env.DB.prepare("SELECT question, COUNT(*) n FROM events WHERE type='ask' AND ts > datetime('now', ?) GROUP BY lower(trim(question)) ORDER BY n DESC LIMIT 12").bind(since).all(),
+      env.DB.prepare("SELECT (SELECT COUNT(*) FROM events WHERE type='ask' AND ts > datetime('now', ?)) asks, (SELECT COUNT(*) FROM events WHERE type='tts' AND ts > datetime('now', ?)) tts_plays, (SELECT ROUND(AVG(latency_ms)) FROM events WHERE type='ask' AND ts > datetime('now', ?)) avg_latency").bind(since, since, since).all(),
+    ]);
+    return json({
+      configured: true,
+      days,
+      totals: totals.results[0],
+      byLang: byLang.results,
+      byMode: byMode.results,
+      topQuestions: top.results,
+      recent: recent.results,
+    });
+  }
+
+  return json({ error: 'Unknown admin endpoint.' }, 404);
 }

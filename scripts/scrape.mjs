@@ -51,6 +51,9 @@ const MAX_PAGES = Number(arg('max', 400));
 const DELAY_MS = Number(arg('delay', 400));
 const OUT = arg('out', 'data/pages.json');
 const SEED = arg('seed', 'https://www.cii.in/');
+// --seeds takes a comma-separated list for focused section crawls
+// (e.g. events + publications + centres of excellence).
+const SEEDS = [SEED, ...arg('seeds', '').split(',').map((s) => s.trim()).filter(Boolean)];
 const HEADFUL = args.includes('--headful');
 const USE_BRIDGE = process.env.BRIDGE
   ? process.env.BRIDGE === '1'
@@ -58,6 +61,10 @@ const USE_BRIDGE = process.env.BRIDGE
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 const ALLOWED_HOSTS = new Set(['www.cii.in', 'cii.in']);
+// --allow-hosts adds extra domains (e.g. Centre of Excellence microsites).
+for (const h of arg('allow-hosts', '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)) {
+  ALLOWED_HOSTS.add(h);
+}
 const SKIP_EXT = /\.(jpg|jpeg|png|gif|svg|webp|ico|css|zip|rar|mp4|mp3|avi|doc|docx|xls|xlsx|ppt|pptx|woff2?|ttf)(\?|$)/i;
 const SKIP_PATH = /(login|signin|signup|logout|cart|wp-admin|mailto:|tel:|javascript:)/i;
 // Social-media redirect stubs on cii.in bounce to external hosts — no content.
@@ -69,7 +76,7 @@ function normalizeUrl(raw, base) {
     if (!/^https?:$/.test(u.protocol)) return null;
     if (!ALLOWED_HOSTS.has(u.hostname)) return null;
     u.hash = '';
-    u.hostname = 'www.cii.in';
+    if (u.hostname === 'cii.in' || u.hostname === 'www.cii.in') u.hostname = 'www.cii.in';
     u.protocol = 'https:';
     for (const p of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'fbclid', 'gclid']) {
       u.searchParams.delete(p);
@@ -254,7 +261,7 @@ async function main() {
     return route.continue();
   });
 
-  const queue = [normalizeUrl(SEED, SEED)];
+  const queue = [...new Set(SEEDS.map((s) => normalizeUrl(s, s)).filter(Boolean))];
   const seen = new Set(queue);
   const pages = [];
   const pdfs = new Map(); // url -> title (recorded, not fetched)

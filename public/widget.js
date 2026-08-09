@@ -168,6 +168,11 @@
       </div>
       <p class="acii-summary">${esc(data.summary || '')}</p>
       <button class="acii-listen" title="Hear this answer">${I.speaker} <span>Listen to this answer</span></button>
+      ${data.summaryEn && data.lang !== 'en' ? `
+        <div class="acii-english">
+          <div class="acii-label" style="margin-top:18px">In English</div>
+          <p class="acii-entext">${esc(data.summaryEn)}</p>
+        </div>` : ''}
       ${(data.sources || []).length ? `
         <div class="acii-label">Sources</div>
         <div>
@@ -230,10 +235,13 @@
   }
 
   /* -------------------------------- voice ----------------------------------- */
+  const MAX_RECORD_MS = 45000;
+  let recCleanup = null; // stops waveform/timer/audio-context for the session
+
   async function toggleRecording() {
     const micBtn = $('.acii-mic');
     if (recorder && recorder.state === 'recording') {
-      recorder.stop();
+      recorder.stop(); // header mic acts as "Done" while recording
       return;
     }
     stopAudio();
@@ -251,13 +259,15 @@
     recorder.onstop = async () => {
       micBtn.classList.remove('acii-rec');
       micBtn.innerHTML = I.mic;
+      micBtn.title = 'Ask by voice';
+      recCleanup?.();
       stream.getTracks().forEach((t) => t.stop());
       const blob = new Blob(recChunks, { type: recorder.mimeType || 'audio/webm' });
       recorder = null;
       input.placeholder = suggestions?.placeholder || 'Ask CII anything — or search sectors, reports, offices, people...';
-      if (recCancelled) { recCancelled = false; return; }
+      if (recCancelled) { recCancelled = false; renderHome(); return; }
       if (blob.size < 2000) { renderHome(); return; } // too short to be speech
-      renderThinking('', 'Transcribing your question…');
+      renderThinking('', 'Heard you! Transcribing your question…');
       try {
         const form = new FormData();
         form.append('audio', blob, 'question.webm');
@@ -272,12 +282,76 @@
     recorder.start();
     micBtn.classList.add('acii-rec');
     micBtn.innerHTML = I.stop;
+    micBtn.title = 'Finish and get the answer';
     const input = $('.acii-input');
     input.value = '';
-    input.placeholder = 'Listening… tap the mic again to finish';
-    $('.acii-body').innerHTML = `
-      <div class="acii-status"><span class="acii-dots"><i></i><i></i><i></i></span>
-      Listening — ask in English, हिंदी, Hinglish or ਪੰਜਾਬੀ…</div>`;
+    input.placeholder = 'Listening…';
+    showListeningPanel(stream);
+  }
+
+  /** Full-body listening view: live waveform, timer, explicit Done / Cancel. */
+  function showListeningPanel(stream) {
+    const body = $('.acii-body');
+    body.innerHTML = `
+      <div class="acii-voice-panel">
+        <div class="acii-voice-mic">${I.mic}</div>
+        <div class="acii-voice-status">Listening — speak your question</div>
+        <div class="acii-voice-langs">English &nbsp;·&nbsp; हिंदी &nbsp;·&nbsp; Hinglish &nbsp;·&nbsp; ਪੰਜਾਬੀ</div>
+        <canvas class="acii-wave" width="360" height="52" aria-hidden="true"></canvas>
+        <div class="acii-voice-timer">0:00</div>
+        <div class="acii-voice-btns">
+          <button class="acii-btn acii-btn-primary acii-voice-done">Done — get my answer</button>
+          <button class="acii-btn acii-btn-secondary acii-voice-cancel">Cancel</button>
+        </div>
+      </div>`;
+    body.querySelector('.acii-voice-done').addEventListener('click', () => recorder?.state === 'recording' && recorder.stop());
+    body.querySelector('.acii-voice-cancel').addEventListener('click', () => {
+      if (recorder?.state === 'recording') { recCancelled = true; recorder.stop(); }
+    });
+
+    // Live waveform from the mic stream — visible proof that we're hearing you.
+    const canvas = body.querySelector('.acii-wave');
+    const cx = canvas.getContext('2d');
+    let actx = null, raf = 0;
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      const analyser = actx.createAnalyser();
+      analyser.fftSize = 128;
+      actx.createMediaStreamSource(stream).connect(analyser);
+      const bins = new Uint8Array(analyser.frequencyBinCount);
+      const draw = () => {
+        analyser.getByteFrequencyData(bins);
+        cx.clearRect(0, 0, canvas.width, canvas.height);
+        const bar = canvas.width / bins.length;
+        for (let i = 0; i < bins.length; i++) {
+          const h = Math.max(3, (bins[i] / 255) * canvas.height);
+          cx.fillStyle = '#2b48c7';
+          cx.globalAlpha = 0.35 + 0.65 * (bins[i] / 255);
+          cx.fillRect(i * bar + 1, (canvas.height - h) / 2, bar - 2, h);
+        }
+        cx.globalAlpha = 1;
+        raf = requestAnimationFrame(draw);
+      };
+      draw();
+    } catch { /* waveform is progressive enhancement */ }
+
+    const t0 = Date.now();
+    const timerEl = body.querySelector('.acii-voice-timer');
+    const statusEl = body.querySelector('.acii-voice-status');
+    const timer = setInterval(() => {
+      const s = Math.floor((Date.now() - t0) / 1000);
+      timerEl.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+      const left = Math.ceil((MAX_RECORD_MS - (Date.now() - t0)) / 1000);
+      if (left <= 10) statusEl.textContent = `Finishing in ${left}s — tap Done when ready`;
+      if (Date.now() - t0 >= MAX_RECORD_MS && recorder?.state === 'recording') recorder.stop();
+    }, 250);
+
+    recCleanup = () => {
+      clearInterval(timer);
+      if (raf) cancelAnimationFrame(raf);
+      actx?.close().catch(() => {});
+      recCleanup = null;
+    };
   }
 
   async function playAnswer(btn) {

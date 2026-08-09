@@ -10,6 +10,19 @@
   "observability": {
     "enabled": true
   },
+  // ── Analytics + voice settings (optional but recommended) ─────────────────
+  // 1. npx wrangler d1 create ask-cii        → copy the database_id it prints
+  // 2. Uncomment this block and paste the id
+  // 3. npx wrangler d1 execute ask-cii --remote --file=schema.sql
+  // 4. npx wrangler secret put ADMIN_TOKEN   → pick a strong token for /admin
+  // Without this block the bot still works; analytics are simply not recorded.
+  // "d1_databases": [
+  //   {
+  //     "binding": "DB",
+  //     "database_name": "ask-cii",
+  //     "database_id": "PASTE-YOUR-DATABASE-ID-HERE"
+  //   }
+  // ],
   "vars": {
     // Models are overridable per-environment; the OPENAI_API_KEY secret is set
     // with `wrangler secret put OPENAI_API_KEY` (locally: .dev.vars).

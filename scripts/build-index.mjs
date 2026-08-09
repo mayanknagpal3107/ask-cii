@@ -97,7 +97,19 @@ function quantize(vectors, dims) {
 }
 
 async function main() {
-  const raw = JSON.parse(fs.readFileSync(IN, 'utf8'));
+  // --in accepts a comma-separated list of scrape outputs; pages are merged
+  // and de-duplicated by URL (later files win).
+  const files = IN.split(',').map((s) => s.trim()).filter(Boolean);
+  const byUrl = new Map();
+  let pdfsIn = [];
+  for (const f of files) {
+    const raw = JSON.parse(fs.readFileSync(f, 'utf8'));
+    for (const p of raw.pages) byUrl.set(p.url, p);
+    pdfsIn = pdfsIn.concat(raw.pdfs || []);
+  }
+  const merged = { pages: [...byUrl.values()], pdfs: [...new Map(pdfsIn.map((p) => [p.url, p])).values()] };
+  console.log(`Merged ${files.length} file(s): ${merged.pages.length} unique pages, ${merged.pdfs.length} PDFs`);
+  const raw = merged;
   fs.mkdirSync(OUT_DIR, { recursive: true });
 
   const pages = [];

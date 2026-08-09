@@ -104,6 +104,7 @@ ok('EN AI badge', await page.locator('.acii-badge').count() === 1);
 ok('EN sources listed', await page.locator('.acii-src').count() >= 1);
 ok('EN action buttons', await page.locator('.acii-btn').count() >= 1);
 ok('EN listen button', await page.locator('.acii-listen').count() === 1);
+ok('EN has no duplicate English block', await page.locator('.acii-english').count() === 0);
 await page.screenshot({ path: `${SCRATCH}/e2e-answer-en.png` });
 
 /* 5. source click targets cii.in (window.open stubbed — no egress in sandbox) */
@@ -122,6 +123,8 @@ await page.press('.acii-input', 'Enter');
 await page.waitForSelector('.acii-summary', { timeout: 90000 });
 const hiSummary = await page.locator('.acii-summary').innerText();
 ok('HI answer in Devanagari', /[ऀ-ॿ]/.test(hiSummary), hiSummary.slice(0, 60));
+const enBlock = await page.locator('.acii-entext').innerText().catch(() => '');
+ok('HI shows English version', enBlock.length > 30 && !/[ऀ-ॿ]/.test(enBlock), enBlock.slice(0, 60));
 await page.screenshot({ path: `${SCRATCH}/e2e-answer-hi.png` });
 
 /* 8. Punjabi */
@@ -157,10 +160,17 @@ page.on('response', (r) => { if (r.url().includes('/api/transcribe')) transcribe
 try {
 await page.click('.acii-mic');
 await page.waitForSelector('.acii-mic.acii-rec', { timeout: 5000 });
-ok('recording state shown', true);
-await page.screenshot({ path: `${SCRATCH}/e2e-recording.png` });
+ok('recording state shown (mic button)', true);
+await page.waitForSelector('.acii-voice-panel', { timeout: 5000 });
+ok('listening panel with waveform', await page.locator('.acii-wave').count() === 1);
+ok('explicit Done button', await page.locator('.acii-voice-done').count() === 1);
+ok('explicit Cancel button', await page.locator('.acii-voice-cancel').count() === 1);
+const timer1 = await page.locator('.acii-voice-timer').innerText();
 await page.waitForTimeout(9000); // capture the ~5s spoken question
-await page.click('.acii-mic'); // stop
+const timer2 = await page.locator('.acii-voice-timer').innerText();
+ok('timer is counting', timer1 !== timer2, `${timer1} -> ${timer2}`);
+await page.screenshot({ path: `${SCRATCH}/e2e-recording.png` });
+await page.click('.acii-voice-done'); // stop via the explicit button
 await page.waitForSelector('.acii-summary', { timeout: 120000 });
 ok('voice transcription accepted', transcribeStatus === 200, `transcribe HTTP ${transcribeStatus}`);
 const voiceQ = await page.locator('.acii-input').inputValue();

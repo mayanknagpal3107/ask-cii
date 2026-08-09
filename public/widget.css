@@ -300,6 +300,56 @@
 }
 .acii-btn-secondary:hover { background: #f4f6ff; }
 
+.acii-english { border-top: 1px solid #eceef4; margin-top: 18px; }
+.acii-entext {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #5c667e;
+  white-space: pre-wrap;
+}
+
+/* ------------------------------ voice panel -------------------------------- */
+.acii-voice-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 34px 20px 26px;
+  gap: 14px;
+}
+.acii-voice-mic {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: #d92d20;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: acii-pulse 1.2s ease infinite;
+}
+.acii-voice-mic svg { width: 36px; height: 36px; }
+.acii-voice-status { font-size: 18px; font-weight: 600; color: #16203a; }
+.acii-voice-langs { font-size: 14px; color: #8b94a7; }
+.acii-wave { width: min(360px, 90%); height: 52px; }
+.acii-voice-timer {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: #d92d20;
+  font-weight: 600;
+}
+.acii-voice-timer::before {
+  content: '';
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #d92d20;
+  margin-right: 8px;
+  vertical-align: 1px;
+  animation: acii-blink 1.2s infinite;
+}
+.acii-voice-btns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+
 /* thinking / status */
 .acii-status {
   display: flex;
