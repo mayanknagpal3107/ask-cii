@@ -101,13 +101,15 @@ await page.waitForSelector('.acii-summary', { timeout: 90000 });
 const enSummary = await page.locator('.acii-summary').innerText();
 ok('EN answer renders', enSummary.length > 40, enSummary.slice(0, 70));
 ok('EN AI badge', await page.locator('.acii-badge').count() === 1);
-ok('EN sources listed', await page.locator('.acii-src').count() >= 1);
+ok('EN sources collapsed by default', await page.locator('.acii-srctoggle').count() === 1 && !(await page.locator('.acii-srclist:not([hidden])').count()));
 ok('EN action buttons', await page.locator('.acii-btn').count() >= 1);
 ok('EN listen button', await page.locator('.acii-listen').count() === 1);
 ok('EN has no duplicate English block', await page.locator('.acii-english').count() === 0);
 await page.screenshot({ path: `${SCRATCH}/e2e-answer-en.png` });
 
-/* 5. source click targets cii.in (window.open stubbed — no egress in sandbox) */
+/* 5. expand sources, then click one (window.open stubbed — no egress in sandbox) */
+await page.click('.acii-srctoggle');
+ok('sources expand on toggle', await page.locator('.acii-srclist:not([hidden])').count() === 1 && await page.locator('.acii-src').count() >= 1);
 await page.evaluate(() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; });
 await page.locator('.acii-src').first().click();
 const opened = await page.evaluate(() => window.__opened);

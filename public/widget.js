@@ -164,7 +164,7 @@
     body.innerHTML = `
       <button class="acii-back">${I.back} Back</button>
       <div>
-        <span class="acii-badge">${I.spark} AI-generated · verify with sources below</span>
+        <span class="acii-badge">${I.spark} AI-generated · verify sources</span>
       </div>
       <p class="acii-summary">${esc(data.summary || '')}</p>
       <button class="acii-listen" title="Hear this answer">${I.speaker} <span>Listen to this answer</span></button>
@@ -173,27 +173,41 @@
           <div class="acii-label" style="margin-top:18px">In English</div>
           <p class="acii-entext">${esc(data.summaryEn)}</p>
         </div>` : ''}
-      ${(data.sources || []).length ? `
-        <div class="acii-label">Sources</div>
-        <div>
-          ${data.sources.map((s) => `
-            <button class="acii-src" data-url="${esc(s.url)}">
-              <span class="acii-srctype">${esc(s.type || 'PAGE')}</span>
-              <span class="acii-srctitle">${esc(s.title)}</span>
-              <span class="acii-srchost">${esc(s.label || hostOf(s.url))}</span>
-            </button>`).join('')}
-        </div>` : ''}
       ${buttons.length ? `
         <div class="acii-actions">
           ${buttons.map((b) => `
             <button class="acii-btn ${b.primary ? 'acii-btn-primary' : 'acii-btn-secondary'}" data-url="${esc(b.url)}">
               ${esc(b.label)}
             </button>`).join('')}
+        </div>` : ''}
+      ${(data.sources || []).length ? `
+        <button class="acii-srctoggle" aria-expanded="false">
+          ${[...new Set(data.sources.map((s) => (s.label || hostOf(s.url)).split('/')[0]))].slice(0, 3).map((d) => `<span class="acii-srcdot">${esc(d)}</span>`).join('')}
+          <span class="acii-srccount">${data.sources.length} source${data.sources.length > 1 ? 's' : ''}</span>
+          <svg class="acii-srcchev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+        <div class="acii-srclist" hidden>
+          ${data.sources.map((s) => `
+            <button class="acii-src" data-url="${esc(s.url)}">
+              <span class="acii-srctype">${esc(s.type || 'PAGE')}</span>
+              <span class="acii-srctitle">${esc(s.title)}</span>
+              <span class="acii-srchost">${esc(s.label || hostOf(s.url))}</span>
+            </button>`).join('')}
         </div>` : ''}`;
 
     $('.acii-back').addEventListener('click', goHome);
     body.querySelectorAll('.acii-src, .acii-btn').forEach((el) =>
       el.addEventListener('click', () => window.open(el.dataset.url, '_blank', 'noopener')));
+    const srcToggle = body.querySelector('.acii-srctoggle');
+    if (srcToggle) {
+      srcToggle.addEventListener('click', () => {
+        const list = body.querySelector('.acii-srclist');
+        const open = list.hidden;
+        list.hidden = !open;
+        srcToggle.setAttribute('aria-expanded', String(open));
+        srcToggle.classList.toggle('acii-srcopen', open);
+      });
+    }
     const listen = body.querySelector('.acii-listen');
     listen.addEventListener('click', () => playAnswer(listen));
     // The user asked by voice — surface the audio option prominently and

@@ -229,6 +229,41 @@
 .acii-listen svg { width: 15px; height: 15px; }
 .acii-listen[disabled] { opacity: 0.6; cursor: default; }
 
+/* Collapsed-by-default sources (Perplexity/ChatGPT-style pill) */
+.acii-srctoggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  border: 1px solid #e4e7ee;
+  background: #fbfcfe;
+  color: #5c667e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.acii-srctoggle:hover { border-color: #2b48c7; background: #f4f6ff; }
+.acii-srcdot {
+  background: #edf1fd;
+  color: #2b48c7;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 2px 8px;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.acii-srcchev { transition: transform 0.18s ease; color: #98a1b3; }
+.acii-srctoggle.acii-srcopen .acii-srcchev { transform: rotate(180deg); }
+.acii-srclist { margin-top: 8px; }
+[hidden].acii-srclist { display: none; }
+
 .acii-src {
   display: flex;
   align-items: center;
