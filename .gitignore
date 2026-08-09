@@ -7,3 +7,4 @@ data/raw/
 data/*.log
 tests/fixtures/
 public/question.wav
+data/*.log
