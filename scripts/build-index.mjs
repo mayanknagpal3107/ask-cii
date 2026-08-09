@@ -107,6 +107,27 @@ async function main() {
     for (const p of raw.pages) byUrl.set(p.url, p);
     pdfsIn = pdfsIn.concat(raw.pdfs || []);
   }
+  // Individual event pages (cam.mycii.in) don't contain the words "upcoming
+  // events", so queries like "what's coming up" would miss them. Synthesize a
+  // calendar page that lists every event with its date and link.
+  const eventPages = [...byUrl.values()].filter((p) => p.url.includes('cam.mycii.in'));
+  if (eventPages.length) {
+    const DATE_RE = /\b\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/i;
+    const lines = eventPages.map((p) => {
+      const head = p.text.split('\n').slice(0, 6).join(' ');
+      const date = (head.match(DATE_RE) || [])[0] || '';
+      return `- ${p.title}${date ? ` — ${date}` : ''} (details: ${p.url})`;
+    });
+    byUrl.set('https://www.cii.in/Events.aspx', {
+      url: 'https://www.cii.in/Events.aspx',
+      title: 'Upcoming CII Events — Forthcoming Conferences, Summits, Trainings',
+      type: 'EVENT',
+      description: `Calendar of ${eventPages.length} upcoming CII events with dates and registration links.`,
+      text: `Upcoming CII events (forthcoming events calendar — what's coming up in the next months):\n${lines.join('\n')}`,
+    });
+    console.log(`Synthesized upcoming-events calendar from ${eventPages.length} event pages`);
+  }
+
   const merged = { pages: [...byUrl.values()], pdfs: [...new Map(pdfsIn.map((p) => [p.url, p])).values()] };
   console.log(`Merged ${files.length} file(s): ${merged.pages.length} unique pages, ${merged.pdfs.length} PDFs`);
   const raw = merged;
