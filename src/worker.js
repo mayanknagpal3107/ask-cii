@@ -35,10 +35,7 @@ export default {
       if (url.pathname === '/api/tts' && request.method === 'POST') return await handleTts(request, env, ctx);
       if (url.pathname.startsWith('/api/admin/')) return await handleAdmin(request, env, url);
       if (url.pathname === '/admin') return env.ASSETS.fetch(new Request(new URL('/admin.html', url.origin)));
-      if (url.pathname === '/api/suggestions') {
-        const res = await env.ASSETS.fetch(new Request(new URL('/data/suggestions.json', url.origin)));
-        return new Response(res.body, { status: res.status, headers: { 'content-type': 'application/json; charset=utf-8', ...CORS } });
-      }
+      if (url.pathname === '/api/suggestions') return await handleSuggestions(request, env, url);
       if (url.pathname === '/api/health') return json({ ok: true, hasKey: Boolean(env.OPENAI_API_KEY) });
     } catch (e) {
       console.error('API error:', e.stack || e.message);
@@ -47,6 +44,51 @@ export default {
     return env.ASSETS.fetch(request);
   },
 };
+
+/* ------------------------------ suggestions -------------------------------- */
+/**
+ * Suggested questions are personalized two ways:
+ *  - visitor location (Cloudflare provides region/country on every request):
+ *    Indian visitors get "CII office in <their state>" style questions;
+ *  - the page hosting the widget (widget sends ?page=<path + title>): on a
+ *    membership page the membership question moves to the top, etc.
+ */
+async function handleSuggestions(request, env, url) {
+  const res = await env.ASSETS.fetch(new Request(new URL('/data/suggestions.json', url.origin)));
+  const base = await res.json().catch(() => ({ questions: [] }));
+
+  const cf = request.cf || {};
+  const geo = [];
+  if (cf.country === 'IN' && cf.region) {
+    geo.push(`CII office in ${cf.region}`, `Upcoming CII events in ${cf.region}`);
+  } else if (cf.country && cf.country !== 'IN') {
+    geo.push('How can international companies partner with CII?');
+  }
+
+  let questions = [...geo, ...(base.questions || []).filter((q) => !geo.includes(q))];
+
+  // Page-context boost: the page the visitor is on signals intent — move the
+  // matching question to the very top (stronger than the geo suggestion).
+  const page = (url.searchParams.get('page') || '').toLowerCase();
+  if (page) {
+    const boosts = [
+      [/member/, 'How do I become a member?'],
+      [/event|conference|summit|training/, 'What are the upcoming CII events?'],
+      [/publication|report|research|economy/, 'CII latest reports'],
+      [/manufactur/, 'What is CII doing in manufacturing?'],
+      [/contact|office|reach/, 'How do I reach out to CII?'],
+      [/about|leader|president/, 'Who are the leadership of CII?'],
+    ];
+    for (const [re, q] of boosts) {
+      if (re.test(page) && questions.includes(q)) {
+        questions = [q, ...questions.filter((x) => x !== q)];
+        break;
+      }
+    }
+  }
+
+  return json({ ...base, questions });
+}
 
 /* ------------------------------ index loading ------------------------------ */
 

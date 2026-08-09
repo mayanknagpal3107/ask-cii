@@ -115,7 +115,10 @@
   /* ---------------------------- suggestions --------------------------------- */
   async function loadSuggestions() {
     try {
-      const res = await fetch(`${ENDPOINT}/api/suggestions`);
+      // Send the host page's path+title so suggestions can match the page the
+      // visitor is on (membership page -> membership question first, etc.).
+      const pageCtx = encodeURIComponent(`${location.pathname} ${document.title}`.slice(0, 200));
+      const res = await fetch(`${ENDPOINT}/api/suggestions?page=${pageCtx}`);
       suggestions = await res.json();
     } catch {
       suggestions = { questions: [] };
