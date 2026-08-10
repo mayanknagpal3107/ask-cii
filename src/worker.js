@@ -203,7 +203,7 @@ function topKIndexes(scores, k) {
   return idx.slice(0, k);
 }
 
-async function retrieve(env, store, question, englishQuery) {
+async function retrieve(env, store, question, englishQuery, preVec = null) {
   const { index, bm25, vectors } = store;
   const qTokens = [...tokenize(question), ...tokenize(englishQuery || '')];
   const lexical = bm25Scores(bm25, qTokens);
@@ -211,7 +211,7 @@ async function retrieve(env, store, question, englishQuery) {
   let combined = lexical;
   if (vectors && env.OPENAI_API_KEY) {
     try {
-      const qVec = await embedQuery(env, englishQuery || question);
+      const qVec = preVec || await embedQuery(env, englishQuery || question);
       const semantic = vectorScores(vectors, qVec);
       const maxOf = (arr) => { let m = 1e-6; for (const x of arr) if (x > m) m = x; return m; };
       const maxLex = maxOf(lexical);
@@ -257,9 +257,9 @@ async function openai(env, path, body, { raw = false, form = null, timeoutMs = 6
   return raw ? res : res.json();
 }
 
-async function chatJSON(env, messages, maxTokens = 700) {
+async function chatJSON(env, messages, maxTokens = 700, model = null) {
   const res = await openai(env, '/v1/chat/completions', {
-    model: env.OPENAI_CHAT_MODEL || 'gpt-4.1-mini',
+    model: model || env.OPENAI_CHAT_MODEL || 'gpt-4.1-mini',
     messages,
     temperature: 0.2,
     max_tokens: maxTokens,
@@ -278,15 +278,36 @@ async function handleAsk(request, env, ctx) {
   const t0 = Date.now();
 
   const origin = new URL(request.url).origin;
-  const store = await loadIndex(env, origin);
+
+  // Edge cache: identical questions (the suggested ones especially) are
+  // served instantly for 6 hours. Guided pathways are personal — never cached.
+  const cacheKey = new Request(`https://ask-cii-cache.local/q/${encodeURIComponent(q.toLowerCase())}`);
+  const cache = caches.default;
+  if (!guided) {
+    const hit = await cache.match(cacheKey).catch(() => null);
+    if (hit) {
+      logEvent(env, ctx, { type: 'ask', mode, lang: 'cached', question: q, latency_ms: Date.now() - t0 });
+      return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), 'x-cache': 'hit' } });
+    }
+  }
+
+  const storeP = loadIndex(env, origin);
 
   // Retrieval-only fallback keeps the widget useful without an API key.
-  if (!env.OPENAI_API_KEY) return retrievalOnlyAnswer(store, q);
+  if (!env.OPENAI_API_KEY) return retrievalOnlyAnswer(await storeP, q);
 
-  // Step 1 — detect language and produce an English search query. The corpus
-  // is English, so Hindi/Hinglish/Punjabi questions are translated for search.
-  // On any failure fall back to searching the raw question in English.
-  const analysis = await chatJSON(env, [
+  // Plainly-English questions skip the language-analysis round trip entirely;
+  // the raw-question embedding starts immediately either way, in parallel.
+  const looksEnglish = /^[\x00-\x7F]+$/.test(q)
+    && !/\b(kaise|kya|hai|hain|kaun|kab|kahan|kyun|mein|karein|karo|banne|bane|chahiye|milega|batao|bataiye|dikhao|hoga|hogi|wala|ke liye)\b/i.test(q);
+  const rawVecP = embedQuery(env, q).catch(() => null);
+
+  // Step 1 — detect language and produce an English search query (a fast
+  // nano model — the corpus is English, so Hindi/Hinglish/Punjabi questions
+  // are translated for search). On any failure, search the raw question.
+  const analysisP = looksEnglish
+    ? Promise.resolve({ lang: 'en', langName: 'English', englishQuery: q, queries: [q] })
+    : chatJSON(env, [
     {
       role: 'system',
       content:
@@ -298,7 +319,9 @@ async function handleAsk(request, env, ctx) {
         '"queries": if the user asked MULTIPLE distinct questions in one message, one English search query per question (max 3); otherwise a single-element array equal to englishQuery.',
     },
     { role: 'user', content: q },
-  ], 220).catch(() => ({ lang: 'en', langName: 'English', englishQuery: q }));
+  ], 220, env.OPENAI_FAST_MODEL || 'gpt-4.1-nano').catch(() => ({ lang: 'en', langName: 'English', englishQuery: q }));
+
+  const [store, analysis, rawVec] = await Promise.all([storeP, analysisP, rawVecP]);
 
   let lang = analysis.lang || 'en';
   let langName = analysis.langName || 'English';
@@ -318,11 +341,11 @@ async function handleAsk(request, env, ctx) {
     ? analysis.queries : [analysis.englishQuery || q]).slice(0, 3);
   let contexts;
   if (queries.length === 1) {
-    contexts = await retrieve(env, store, q, queries[0]);
+    contexts = await retrieve(env, store, q, queries[0], rawVec);
   } else {
     // Multiple questions in one message: retrieve for each and interleave so
     // every question has supporting context.
-    const per = await Promise.all(queries.map((sub) => retrieve(env, store, sub, sub)));
+    const per = await Promise.all(queries.map((sub) => retrieve(env, store, sub, sub, rawVec)));
     const seen = new Set();
     contexts = [];
     for (let i = 0; contexts.length < 8; i++) {
@@ -348,7 +371,7 @@ async function handleAsk(request, env, ctx) {
 
   // Step 2 — grounded answer in the asker's language.
   const contextBlock = contexts
-    .map((c, i) => `[${i + 1}] ${c.page.title} (${c.page.type})\nURL: ${c.page.url}\n${c.texts.join('\n---\n').slice(0, 3200)}`)
+    .map((c, i) => `[${i + 1}] ${c.page.title} (${c.page.type})\nURL: ${c.page.url}\n${c.texts.join('\n---\n').slice(0, 2600)}`)
     .join('\n\n');
 
   const answer = await chatJSON(env, [
@@ -475,7 +498,11 @@ async function handleAsk(request, env, ctx) {
     confidence: payload.confidence,
     latency_ms: Date.now() - t0,
   });
-  return json(payload);
+  const res = json(payload, 200, { 'cache-control': 'public, s-maxage=21600' });
+  if (!guided && payload.confidence !== 'low') {
+    ctx?.waitUntil?.(cache.put(cacheKey, res.clone()).catch(() => {}));
+  }
+  return res;
 }
 
 function labelForUrl(u) {
