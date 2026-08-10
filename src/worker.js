@@ -271,7 +271,7 @@ async function chatJSON(env, messages, maxTokens = 700, model = null) {
 /* -------------------------------- /api/ask --------------------------------- */
 
 async function handleAsk(request, env, ctx) {
-  const { question, voice, guided } = await request.json().catch(() => ({}));
+  const { question, voice, guided, stream } = await request.json().catch(() => ({}));
   const q = (question || '').trim().slice(0, 900);
   if (!q) return json({ error: 'Missing "question".' }, 400);
   const mode = guided ? 'guided' : voice ? 'voice' : 'text';
@@ -287,6 +287,7 @@ async function handleAsk(request, env, ctx) {
     const hit = await cache.match(cacheKey).catch(() => null);
     if (hit) {
       logEvent(env, ctx, { type: 'ask', mode, lang: 'cached', question: q, latency_ms: Date.now() - t0 });
+      if (stream) return ndjsonOnce(await hit.json());
       return new Response(hit.body, { headers: { ...Object.fromEntries(hit.headers), 'x-cache': 'hit' } });
     }
   }
@@ -294,7 +295,10 @@ async function handleAsk(request, env, ctx) {
   const storeP = loadIndex(env, origin);
 
   // Retrieval-only fallback keeps the widget useful without an API key.
-  if (!env.OPENAI_API_KEY) return retrievalOnlyAnswer(await storeP, q);
+  if (!env.OPENAI_API_KEY) {
+    const r = retrievalOnlyAnswer(await storeP, q);
+    return stream ? ndjsonOnce(await r.clone().json()) : r;
+  }
 
   // Plainly-English questions skip the language-analysis round trip entirely;
   // the raw-question embedding starts immediately either way, in parallel.
@@ -359,14 +363,13 @@ async function handleAsk(request, env, ctx) {
   }
 
   if (!contexts.length) {
-    return json({
+    const empty = {
       summary: await translateFallback(env, langName),
       lang, langName,
       link: { label: 'Visit cii.in', url: 'https://www.cii.in' },
-      actions: [],
-      sources: [],
-      confidence: 'low',
-    });
+      actions: [], sources: [], confidence: 'low',
+    };
+    return stream ? ndjsonOnce(empty) : json(empty);
   }
 
   // Step 2 — grounded answer in the asker's language.
@@ -374,10 +377,7 @@ async function handleAsk(request, env, ctx) {
     .map((c, i) => `[${i + 1}] ${c.page.title} (${c.page.type})\nURL: ${c.page.url}\n${c.texts.join('\n---\n').slice(0, 2600)}`)
     .join('\n\n');
 
-  const answer = await chatJSON(env, [
-    {
-      role: 'system',
-      content:
+  const rulesHead =
         'You are "Ask CII", the assistant for the Confederation of Indian Industry website (cii.in). Your audience is MSME owners, founders, corporate executives and senior professionals. Your goal is to GUIDE the visitor: every answer must lead with the most useful ACTION they can take next.\n' +
         'Rules:\n' +
         '0a. TONE: Write like a courteous, precise business advisor — professional and confident, never casual. No slang, no exclamations, no filler. In Hindi/Hinglish always use the respectful register (aap, kijiye/karein — never tu/tum/karo).\n' +
@@ -395,19 +395,54 @@ async function handleAsk(request, env, ctx) {
         '9. "actions": up to 1 additional {label, url} button, also verb-first. URL from the context.\n' +
         '10. "sources": array of context numbers (integers) you actually used, most relevant first, max 3.\n' +
         '11. "place": when the answer points to a physical venue/office/address, that place as a short "Name, City" string (e.g. "Chennai Trade Centre, Chennai" or "CII HQ, New Delhi"); else null.\n' +
-        '12. "confidence": "high" | "medium" | "low" — how well the context answers the question.\n' +
-        'Return strict JSON: {"summary": string, "summaryEn": string|null, "items": [{"title","detail","url"}], "link": {"label": string, "url": string}, "actions": [{"label","url"}], "sources": [int], "place": string|null, "confidence": string}',
-    },
-    { role: 'user', content: `Question (${langName}): ${q}\n\nContext:\n${contextBlock}` },
-  ], 1100).catch(() => ({
+        '12. "confidence": "high" | "medium" | "low" — how well the context answers the question.\n';
+  const userMsg = `Question (${langName}): ${q}\n\nContext:\n${contextBlock}`;
+  const fallbackAnswer = () => ({
     // Extractive fallback keeps the widget alive if the answer call fails.
     summary: contexts[0].texts[0].split('\n').slice(1).join(' ').slice(0, 300),
     link: { label: 'Open page', url: contexts[0].page.url },
     actions: [],
     sources: [1],
     confidence: 'low',
-  }));
+  });
 
+  if (stream) {
+    return streamAnswer(env, ctx, {
+      rulesHead, userMsg, contexts, q, lang, langName, mode, t0,
+      cacheKey, cache, cacheable: !guided,
+    });
+  }
+
+  const answer = await chatJSON(env, [
+    {
+      role: 'system',
+      content: rulesHead +
+        'Return strict JSON: {"summary": string, "summaryEn": string|null, "items": [{"title","detail","url"}], "link": {"label": string, "url": string}, "actions": [{"label","url"}], "sources": [int], "place": string|null, "confidence": string}',
+    },
+    { role: 'user', content: userMsg },
+  ], 1100).catch(fallbackAnswer);
+
+  const payload = finalizeAnswer(answer, contexts, lang, langName);
+  logEvent(env, ctx, {
+    type: 'ask',
+    mode,
+    lang,
+    question: q,
+    summary: payload.summary,
+    summary_en: payload.summaryEn || (lang === 'en' ? payload.summary : null),
+    link: payload.link.url,
+    confidence: payload.confidence,
+    latency_ms: Date.now() - t0,
+  });
+  const res = json(payload, 200, { 'cache-control': 'public, s-maxage=21600' });
+  if (!guided && payload.confidence !== 'low') {
+    ctx?.waitUntil?.(cache.put(cacheKey, res.clone()).catch(() => {}));
+  }
+  return res;
+}
+
+/** Grounding + shaping shared by the JSON and streaming answer paths. */
+function finalizeAnswer(answer, contexts, lang, langName) {
   // Server-side grounding: only URLs that exist in the retrieved context —
   // as a context page or mentioned inside context text (e.g. per-event
   // registration links) — may be returned.
@@ -487,22 +522,119 @@ async function handleAsk(request, env, ctx) {
     sources: sources.slice(0, 3),
     confidence: ['high', 'medium', 'low'].includes(answer.confidence) ? answer.confidence : 'medium',
   };
-  logEvent(env, ctx, {
-    type: 'ask',
-    mode,
-    lang,
-    question: q,
-    summary,
-    summary_en: summaryEn || (lang === 'en' ? summary : null),
-    link: payload.link.url,
-    confidence: payload.confidence,
-    latency_ms: Date.now() - t0,
-  });
-  const res = json(payload, 200, { 'cache-control': 'public, s-maxage=21600' });
-  if (!guided && payload.confidence !== 'low') {
-    ctx?.waitUntil?.(cache.put(cacheKey, res.clone()).catch(() => {}));
-  }
-  return res;
+  return payload;
+}
+
+/* ------------------------------ streaming ---------------------------------- */
+
+const NDJSON_HEADERS = { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store', ...CORS };
+
+/** One-shot NDJSON response (cache hits, fallbacks) in the stream protocol. */
+function ndjsonOnce(payload) {
+  const body = `${JSON.stringify({ t: 'd', s: payload.summary })}\n${JSON.stringify({ t: 'final', payload })}\n`;
+  return new Response(body, { headers: NDJSON_HEADERS });
+}
+
+/**
+ * True token streaming: the model writes the summary as plain text (forwarded
+ * to the client as it generates), then a <<<META>>> sentinel, then the
+ * metadata JSON. The client sees first words at time-to-first-token.
+ */
+function streamAnswer(env, ctx, opts) {
+  const { rulesHead, userMsg, contexts, q, lang, langName, mode, t0, cacheKey, cache, cacheable } = opts;
+  const SENT = '<<<META>>>';
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const enc = new TextEncoder();
+  const send = (obj) => writer.write(enc.encode(`${JSON.stringify(obj)}\n`));
+
+  ctx.waitUntil((async () => {
+    let summary = '';
+    let metaBuf = '';
+    let metaMode = false;
+    let textBuf = '';
+    try {
+      const res = await openai(env, '/v1/chat/completions', {
+        model: env.OPENAI_CHAT_MODEL || 'gpt-4.1-mini',
+        messages: [
+          {
+            role: 'system',
+            content: rulesHead +
+              `OUTPUT FORMAT (STRICT): First write ONLY the summary text exactly as it should be shown (plain text, all rules above apply). Then, on its own line, write exactly ${SENT} . Then strict JSON with everything else: {"summaryEn": string|null, "items": [{"title","detail","url"}], "link": {"label","url"}, "actions": [{"label","url"}], "sources": [int], "place": string|null, "confidence": string} — no "summary" field, no markdown fences.`,
+          },
+          { role: 'user', content: userMsg },
+        ],
+        temperature: 0.2,
+        max_tokens: 1100,
+        stream: true,
+      }, { raw: true, timeoutMs: 90000 });
+
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let sse = '';
+      const onDelta = async (d) => {
+        if (metaMode) { metaBuf += d; return; }
+        textBuf += d;
+        const idx = textBuf.indexOf(SENT);
+        if (idx >= 0) {
+          const emit = textBuf.slice(0, idx).replace(/\s+$/, '');
+          if (emit.length > summary.length) { await send({ t: 'd', s: emit.slice(summary.length) }); summary = emit; }
+          metaMode = true;
+          metaBuf = textBuf.slice(idx + SENT.length);
+        } else if (textBuf.length > summary.length + SENT.length) {
+          // hold back a sentinel-sized tail so a split marker never leaks
+          const emitTo = textBuf.length - SENT.length;
+          await send({ t: 'd', s: textBuf.slice(summary.length, emitTo) });
+          summary = textBuf.slice(0, emitTo);
+        }
+      };
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        sse += dec.decode(value, { stream: true });
+        let nl;
+        while ((nl = sse.indexOf('\n')) >= 0) {
+          const line = sse.slice(0, nl).trim();
+          sse = sse.slice(nl + 1);
+          if (!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (data === '[DONE]') continue;
+          try {
+            const delta = JSON.parse(data).choices?.[0]?.delta?.content || '';
+            if (delta) await onDelta(delta);
+          } catch { /* keep-alives / partial frames */ }
+        }
+      }
+      if (!metaMode && textBuf.length > summary.length) {
+        await send({ t: 'd', s: textBuf.slice(summary.length) });
+        summary = textBuf;
+      }
+
+      let meta = {};
+      const m = metaBuf.match(/\{[\s\S]*\}/);
+      if (m) { try { meta = JSON.parse(m[0]); } catch { meta = {}; } }
+      const payload = finalizeAnswer({ ...meta, summary: summary.trim() }, contexts, lang, langName);
+      await send({ t: 'final', payload });
+
+      logEvent(env, ctx, {
+        type: 'ask', mode, lang, question: q,
+        summary: payload.summary,
+        summary_en: payload.summaryEn || (lang === 'en' ? payload.summary : null),
+        link: payload.link.url, confidence: payload.confidence,
+        latency_ms: Date.now() - t0,
+      });
+      if (cacheable && payload.confidence !== 'low') {
+        await cache.put(cacheKey, json(payload, 200, { 'cache-control': 'public, s-maxage=21600' })).catch(() => {});
+      }
+    } catch (e) {
+      console.error('stream error:', e.message);
+      await send({ t: 'error', message: 'The answer could not be generated. Please try again.' }).catch(() => {});
+    } finally {
+      await writer.close().catch(() => {});
+    }
+  })());
+
+  return new Response(readable, { headers: NDJSON_HEADERS });
 }
 
 function labelForUrl(u) {

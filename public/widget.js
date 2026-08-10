@@ -219,9 +219,10 @@
     body.querySelector('.acii-back').addEventListener('click', goHome);
   }
 
-  function renderAnswer(q, data, { voice = false, pathway = false } = {}) {
+  function renderAnswer(q, data, { voice = false, pathway = false, instant = false } = {}) {
     clearInterval(thinkTimer);
     lastAnswer = data;
+    // (the .acii-done marker below tells tests/integrations the answer is complete)
     // Max two CTAs: one primary (the best link) + one secondary.
     const secondary = (data.actions || []).find((a) => a && a.url && a.url !== data.link?.url);
     const buttons = [
@@ -230,15 +231,15 @@
     ].filter(Boolean);
     const srcDomains = [...new Set((data.sources || []).map((s) => (s.label || hostOf(s.url)).split('/')[0]))].slice(0, 3);
     // Blocks below the summary fade in after the word-by-word reveal ends.
-    const tail = Math.min((data.summary || '').split(/\s+/).length, 70) * 26 + 150;
-    const after = (i) => `animation-delay:${tail + i * 110}ms`;
+    const tail = instant ? 0 : Math.min((data.summary || '').split(/\s+/).length, 70) * 26 + 150;
+    const after = (i) => `animation-delay:${tail + i * (instant ? 40 : 110)}ms`;
 
     const body = setBody(`
       <button class="acii-back">${I.back} Back</button>
       <div>
         <span class="acii-badge ${pathway ? 'acii-badge-path' : ''}">${I.spark} ${pathway ? 'Your personalised pathway · based on your profile' : 'AI-generated · verify sources'}</span>
       </div>
-      <p class="acii-summary">${revealWords(data.summary || '')}</p>
+      <p class="acii-summary">${instant ? linkify(data.summary || '') : revealWords(data.summary || '')}</p>
       ${data.place ? `
         <a class="acii-map acii-stagger" style="${after(0)}" target="_blank" rel="noopener"
            href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.place)}">
@@ -284,6 +285,7 @@
             </button>`).join('')}
         </div>` : ''}`);
 
+    body.querySelector('.acii-view')?.classList.add('acii-done');
     body.querySelector('.acii-back').addEventListener('click', goHome);
     body.querySelectorAll('.acii-src, .acii-btn, .acii-item').forEach((el) =>
       el.addEventListener('click', () => window.open(el.dataset.url, '_blank', 'noopener')));
@@ -422,6 +424,16 @@
     }
   }
 
+  /** Minimal answer shell that live text streams into. */
+  function renderStreamShell() {
+    const body = setBody(`
+      <button class="acii-back">${I.back} Back</button>
+      <div><span class="acii-badge">${I.spark} AI-generated · verify sources</span></div>
+      <p class="acii-summary"><span class="acii-cursor"></span></p>`);
+    body.querySelector('.acii-back').addEventListener('click', goHome);
+    return body.querySelector('.acii-summary');
+  }
+
   /* --------------------------------- ask ------------------------------------ */
   async function ask(q, { voice = false } = {}) {
     if (busy || !q) return;
@@ -435,12 +447,53 @@
       const res = await fetch(`${ENDPOINT}/api/ask`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ question: q, voice }),
+        body: JSON.stringify({ question: q, voice, stream: true }),
       });
-      const data = await res.json();
-      if (!res.ok || data.error) throw new Error(data.error || `Request failed (${res.status})`);
+      const ctype = res.headers.get('content-type') || '';
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Request failed (${res.status})`);
+      }
+
+      let data = null;
+      if (ctype.includes('ndjson') && res.body) {
+        // Token stream: words appear the moment the model writes them.
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = '';
+        let text = '';
+        let sumEl = null;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let nl;
+          while ((nl = buf.indexOf('\n')) >= 0) {
+            const line = buf.slice(0, nl).trim();
+            buf = buf.slice(nl + 1);
+            if (!line) continue;
+            let ev;
+            try { ev = JSON.parse(line); } catch { continue; }
+            if (ev.t === 'd' && ev.s) {
+              if (!sumEl) sumEl = renderStreamShell();
+              text += ev.s;
+              sumEl.innerHTML = `${linkify(text)}<span class="acii-cursor"></span>`;
+            } else if (ev.t === 'final') {
+              data = ev.payload;
+            } else if (ev.t === 'error') {
+              throw new Error(ev.message || 'stream failed');
+            }
+          }
+        }
+        if (!data && text) data = { summary: text, lang: 'en', langName: 'English', link: null, actions: [], sources: [] };
+      } else {
+        data = await res.json();
+        if (data.error) throw new Error(data.error);
+      }
+
+      if (!data) throw new Error('No answer received');
       history.add(q);
-      renderAnswer(q, data, { voice });
+      renderAnswer(q, data, { voice, instant: true });
     } catch (e) {
       renderError(`Couldn't get an answer: ${e.message}. Please try again.`);
     } finally {
