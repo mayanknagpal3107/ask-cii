@@ -2,36 +2,52 @@
  * Ask CII — browser end-to-end suite.
  *
  * Run `npm run dev` in another terminal, then: `npm run test:e2e`
+ * Point it at a deployed instance with E2E_BASE=https://... — in proxied
+ * sandboxes the suite routes the browser through the same local TLS bridge
+ * the scraper uses (Chromium's TLS handshake is otherwise reset by the
+ * egress proxy).
  * Covers the popup UI, text answers in EN/HI/PA/Hinglish, source links, and
  * the full voice loop (spoken question -> transcribe -> answer -> spoken
- * reply). The microphone is emulated at the WebAudio layer with a WAV of a
- * real spoken question (generated once via OpenAI TTS; needs OPENAI_API_KEY
- * in .dev.vars the first time). On machines with no audio output device the
- * playback-state check is skipped instead of asserted.
+ * reply) in English AND Hindi. The microphone is emulated at the WebAudio
+ * layer with spoken-question audio generated via the target's own /api/tts,
+ * so no OpenAI key is needed on the test machine. On machines with no audio
+ * output device the playback-state check is skipped instead of asserted.
  */
 import { chromium } from 'playwright';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { startBridge } from '../scripts/tls-bridge.mjs';
+
+// Node's fetch only honors HTTPS_PROXY when NODE_USE_ENV_PROXY=1 (Node >= 22.21).
+if (process.env.HTTPS_PROXY && !process.env.NODE_USE_ENV_PROXY) {
+  const r = spawnSync(process.execPath, process.argv.slice(1), {
+    stdio: 'inherit',
+    env: { ...process.env, NODE_USE_ENV_PROXY: '1' },
+  });
+  process.exit(r.status ?? 1);
+}
 
 const SCRATCH = new URL('./fixtures/', import.meta.url).pathname;
 const BASE = process.env.E2E_BASE || 'http://127.0.0.1:8787';
+const REMOTE = /^https:/.test(BASE) && Boolean(process.env.HTTPS_PROXY || process.env.https_proxy);
 
 fs.mkdirSync(SCRATCH, { recursive: true });
-if (!fs.existsSync(`${SCRATCH}/question.wav`)) {
-  let key = process.env.OPENAI_API_KEY;
-  if (!key && fs.existsSync('.dev.vars')) {
-    key = (fs.readFileSync('.dev.vars', 'utf8').match(/^OPENAI_API_KEY\s*=\s*(.+)$/m) || [])[1]?.trim();
-  }
-  if (!key) { console.error('No fixtures/question.wav and no OPENAI_API_KEY to generate it.'); process.exit(2); }
-  console.log('Generating spoken-question fixture via OpenAI TTS...');
-  const r = await fetch('https://api.openai.com/v1/audio/speech', {
+// Spoken-question fixtures come from the target's own /api/tts — if that
+// endpoint can't produce playable audio, voice mode can't work either.
+const FIXTURES = {
+  en: { file: 'question-en.mp3', text: 'How do I become a member of CII?', lang: 'english' },
+  hi: { file: 'question-hi.mp3', text: 'CII की सदस्यता कैसे लें?', lang: 'hindi' },
+};
+for (const f of Object.values(FIXTURES)) {
+  if (fs.existsSync(`${SCRATCH}/${f.file}`)) continue;
+  console.log(`Generating spoken-question fixture ${f.file} via ${BASE}/api/tts...`);
+  const r = await fetch(`${BASE}/api/tts`, {
     method: 'POST',
-    headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ model: 'gpt-4o-mini-tts', voice: 'coral', response_format: 'wav',
-      input: 'CII ka member kaise ban sakte hain?',
-      instructions: 'Speak in Hinglish with an Indian accent, natural pace.' }),
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text: f.text, lang: f.lang }),
   });
   if (!r.ok) { console.error('TTS fixture generation failed:', r.status); process.exit(2); }
-  fs.writeFileSync(`${SCRATCH}/question.wav`, Buffer.from(await r.arrayBuffer()));
+  fs.writeFileSync(`${SCRATCH}/${f.file}`, Buffer.from(await r.arrayBuffer()));
 }
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = '') => {
@@ -39,29 +55,37 @@ const ok = (name, cond, extra = '') => {
   else { fail++; console.log(`FAIL  ${name}${extra ? ' — ' + extra : ''}`); }
 };
 
+const bridge = REMOTE ? await startBridge() : null;
+if (bridge) console.log(`Browser routed via local TLS bridge on 127.0.0.1:${bridge.port}`);
+
 const browser = await chromium.launch({
   headless: true,
   executablePath: process.env.CHROMIUM_PATH || undefined,
+  proxy: bridge ? { server: `http://127.0.0.1:${bridge.port}` } : undefined,
   args: [
     '--use-fake-device-for-media-capture',
-    `--use-file-for-fake-audio-capture=${SCRATCH}/question.wav`,
     '--use-fake-ui-for-media-capture',
     '--autoplay-policy=no-user-gesture-required',
     '--disable-features=AudioServiceOutOfProcess,AudioServiceSandbox',
   ],
 });
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+const ctx = await browser.newContext({
+  viewport: { width: 1440, height: 1000 },
+  // Only trust-related effect of the bridge: its throwaway local cert.
+  ignoreHTTPSErrors: Boolean(bridge),
+});
 await ctx.grantPermissions(['microphone'], { origin: BASE });
 // No audio devices exist in this container (even fake ones), so emulate the
 // microphone at the WebAudio layer: getUserMedia returns a MediaStream that
-// plays the spoken-question WAV. Everything downstream (MediaRecorder, the
-// widget, /api/transcribe) runs the real code path.
+// plays the spoken question the test injects as window.__fixtureB64.
+// Everything downstream (MediaRecorder, the widget, /api/transcribe) runs
+// the real code path.
 await ctx.addInitScript(() => {
   navigator.mediaDevices.getUserMedia = async () => {
     const actx = new AudioContext();
     await actx.resume();
-    const buf = await (await fetch('/question.wav')).arrayBuffer();
-    const audioBuf = await actx.decodeAudioData(buf);
+    const bytes = Uint8Array.from(atob(window.__fixtureB64 || ''), (c) => c.charCodeAt(0));
+    const audioBuf = await actx.decodeAudioData(bytes.buffer);
     const srcNode = actx.createBufferSource();
     srcNode.buffer = audioBuf;
     const dest = actx.createMediaStreamDestination();
@@ -72,9 +96,10 @@ await ctx.addInitScript(() => {
 });
 const page = await ctx.newPage();
 page.on('console', (m) => { if (m.type() === 'error') console.log('  [console error]', m.text().slice(0, 140)); });
-
-fs.copyFileSync(`${SCRATCH}/question.wav`, 'public/question.wav');
-process.on('exit', () => { try { fs.unlinkSync('public/question.wav'); } catch {} });
+const setFixture = async (langKey) => {
+  const b64 = fs.readFileSync(`${SCRATCH}/${FIXTURES[langKey].file}`).toString('base64');
+  await page.evaluate((b) => { window.__fixtureB64 = b; }, b64);
+};
 
 /* 1. landing + assets */
 const resp = await page.goto(BASE + '/', { waitUntil: 'networkidle' });
@@ -193,8 +218,9 @@ ok('event item links to its event page', /cam\.mycii\.in|cii\.in/.test(itemUrl |
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-events-items.png` });
 
-/* 10. VOICE MODE — fake mic plays the Hinglish question WAV */
+/* 10. VOICE MODE (English) — fake mic plays the spoken English question */
 await page.click('.acii-back');
+await setFixture('en');
 const gumErr = await page.evaluate(async () => {
   try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); s.getTracks().forEach(t => t.stop()); return null; }
   catch (e) { return `${e.name}: ${e.message}`; }
@@ -217,20 +243,20 @@ ok('Apple-style listening glow on modal', await page.locator('.acii-modal.acii-l
 ok('explicit Done button', await page.locator('.acii-voice-done').count() === 1);
 ok('explicit Cancel button', await page.locator('.acii-voice-cancel').count() === 1);
 const timer1 = await page.locator('.acii-voice-timer').innerText();
-await page.waitForTimeout(9000); // capture the ~5s spoken question
+await page.waitForTimeout(9000); // capture the ~4s spoken question
 const timer2 = await page.locator('.acii-voice-timer').innerText();
 ok('timer is counting', timer1 !== timer2, `${timer1} -> ${timer2}`);
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-recording.png` });
 await page.click('.acii-voice-done'); // stop via the explicit button
 await page.waitForSelector('.acii-done .acii-summary', { timeout: 120000 });
-ok('voice transcription accepted', transcribeStatus === 200, `transcribe HTTP ${transcribeStatus}`);
+ok('EN voice transcription accepted', transcribeStatus === 200, `transcribe HTTP ${transcribeStatus}`);
 const voiceQ = await page.locator('.acii-input').inputValue();
-ok('transcript filled input', voiceQ.length > 5, voiceQ.slice(0, 70));
+ok('EN transcript filled input', /member|cii/i.test(voiceQ), voiceQ.slice(0, 70));
 const voiceSummary = await page.locator('.acii-summary').innerText();
-ok('voice answer rendered', voiceSummary.length > 30, voiceSummary.slice(0, 70));
+ok('EN voice answer rendered', voiceSummary.length > 30, voiceSummary.slice(0, 70));
 await page.waitForTimeout(4000); // allow auto TTS fetch
-ok('audio answer auto-fetched (TTS)', ttsStatus === 200, `tts HTTP ${ttsStatus}`);
+ok('EN spoken reply fetched (TTS)', ttsStatus === 200, `tts HTTP ${ttsStatus}`);
 const hasAudioOut = await page.evaluate(async () =>
   (await navigator.mediaDevices.enumerateDevices()).some((d) => d.kind === 'audiooutput'));
 if (hasAudioOut) {
@@ -242,7 +268,31 @@ if (hasAudioOut) {
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-voice-answer.png` });
 
-} catch (e) { fail++; console.log('FAIL  voice flow crashed —', e.message.split('\n')[0]); }
+} catch (e) { fail++; console.log('FAIL  EN voice flow crashed —', e.message.split('\n')[0]); }
+
+/* 10b. VOICE MODE (Hindi) — spoken Hindi in, Hindi answer + spoken reply out */
+try {
+await page.click('.acii-back');
+await setFixture('hi');
+ttsStatus = null; transcribeStatus = null;
+await page.click('.acii-mic');
+await page.waitForSelector('.acii-voice-panel', { timeout: 5000 });
+await page.waitForTimeout(9000); // capture the spoken Hindi question
+await page.click('.acii-voice-done');
+await page.waitForSelector('.acii-done .acii-summary', { timeout: 120000 });
+ok('HI voice transcription accepted', transcribeStatus === 200, `transcribe HTTP ${transcribeStatus}`);
+const hiQ = await page.locator('.acii-input').inputValue();
+ok('HI transcript filled input', /[ऀ-ॿ]/.test(hiQ) || /sadasyata|cii/i.test(hiQ), hiQ.slice(0, 70));
+const hiVoice = await page.locator('.acii-summary').innerText();
+ok('HI voice answer in Devanagari', /[ऀ-ॿ]/.test(hiVoice), hiVoice.slice(0, 60));
+const hiVoiceEn = await page.locator('.acii-entext').innerText().catch(() => '');
+ok('HI voice answer shows English version', hiVoiceEn.length > 30, hiVoiceEn.slice(0, 60));
+await page.waitForTimeout(4000); // allow auto TTS fetch
+ok('HI spoken reply fetched (TTS)', ttsStatus === 200, `tts HTTP ${ttsStatus}`);
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${SCRATCH}/e2e-voice-answer-hi.png` });
+
+} catch (e) { fail++; console.log('FAIL  HI voice flow crashed —', e.message.split('\n')[0]); }
 
 /* 11. listen toggle stops */
 try {
@@ -259,6 +309,7 @@ ok('esc closes popup', !(await page.locator('.acii-overlay.acii-open').count()))
 /* 13. mobile: search works on a phone-sized touch browser */
 const mctx = await browser.newContext({
   viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true,
+  ignoreHTTPSErrors: Boolean(bridge),
   userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
 });
 const mp = await mctx.newPage();
@@ -277,5 +328,6 @@ await mp.screenshot({ path: `${SCRATCH}/e2e-mobile.png` });
 await mctx.close();
 
 await browser.close();
+bridge?.close();
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

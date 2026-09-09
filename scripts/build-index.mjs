@@ -78,22 +78,43 @@ async function embedBatch(texts, apiKey) {
  *   uint32 count, uint32 dims,
  *   then per vector: float32 scale, int8[dims]  (value ≈ int8 * scale)
  */
-function quantize(vectors, dims) {
-  const rec = 4 + dims;
-  const buf = Buffer.alloc(8 + vectors.length * rec);
-  buf.writeUInt32LE(vectors.length, 0);
-  buf.writeUInt32LE(dims, 4);
-  vectors.forEach((v, i) => {
-    // Unit-normalize, then per-vector int8 quantization.
-    const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
-    const unit = v.map((x) => x / norm);
-    const maxAbs = Math.max(...unit.map(Math.abs)) || 1;
-    const scale = maxAbs / 127;
-    const off = 8 + i * rec;
-    buf.writeFloatLE(scale, off);
-    for (let j = 0; j < dims; j++) buf.writeInt8(Math.round(unit[j] / scale), off + 4 + j);
-  });
+function quantizeOne(v, dims) {
+  // Unit-normalize, then per-vector int8 quantization.
+  const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
+  const unit = v.map((x) => x / norm);
+  const maxAbs = Math.max(...unit.map(Math.abs)) || 1;
+  const scale = maxAbs / 127;
+  const buf = Buffer.alloc(4 + dims);
+  buf.writeFloatLE(scale, 0);
+  for (let j = 0; j < dims; j++) buf.writeInt8(Math.round(unit[j] / scale), 4 + j);
   return buf;
+}
+
+/**
+ * Load the previous index's quantized records keyed by chunk text, so
+ * rebuilds only pay to embed new/changed content — and still produce a
+ * mostly-embedded index when no usable OPENAI_API_KEY is present.
+ */
+function loadPrevRecords(outDir) {
+  try {
+    const idx = JSON.parse(fs.readFileSync(path.join(outDir, 'index.json'), 'utf8'));
+    const emb = idx.embeddings;
+    if (!emb || emb.model !== EMBED_MODEL || emb.dims !== EMBED_DIMS) return null;
+    const bin = fs.readFileSync(path.join(outDir, emb.file || 'vectors.bin'));
+    const count = bin.readUInt32LE(0);
+    const dims = bin.readUInt32LE(4);
+    if (dims !== EMBED_DIMS || count !== idx.chunks.length) return null;
+    const rec = 4 + dims;
+    const map = new Map();
+    for (let i = 0; i < count; i++) {
+      const r = bin.subarray(8 + i * rec, 8 + (i + 1) * rec);
+      // Zero-scale records are placeholders from an earlier keyless build.
+      if (r.readFloatLE(0) !== 0 && !map.has(idx.chunks[i].t)) map.set(idx.chunks[i].t, Buffer.from(r));
+    }
+    return map;
+  } catch {
+    return null;
+  }
 }
 
 async function main() {
@@ -107,25 +128,48 @@ async function main() {
     for (const p of raw.pages) byUrl.set(p.url, p);
     pdfsIn = pdfsIn.concat(raw.pdfs || []);
   }
+  // Some event pages render as error shells (unpublished/removed events) —
+  // they carry no content and would pollute retrieval, so drop them.
+  for (const [u, p] of byUrl) {
+    if (/Error while processing your request/i.test(p.text || '') && (p.text || '').length < 400) byUrl.delete(u);
+  }
+
   // Individual event pages (cam.mycii.in) don't contain the words "upcoming
   // events", so queries like "what's coming up" would miss them. Synthesize a
   // calendar page that lists every event with its date and link.
-  const eventPages = [...byUrl.values()].filter((p) => p.url.includes('cam.mycii.in'));
+  const eventPages = [...byUrl.values()].filter((p) => p.url.includes('cam.mycii.in') && !/^https?:\/\//.test(p.title));
   if (eventPages.length) {
-    const DATE_RE = /\b\d{1,2}(?:\s*[-–]\s*\d{1,2})?\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}/i;
-    const lines = eventPages.map((p) => {
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+      'August', 'September', 'October', 'November', 'December'];
+    const DATE_RE = new RegExp(`\\b(\\d{1,2})(?:\\s*[-–]\\s*(\\d{1,2}))?\\s+(${MONTHS.join('|')})\\s+(\\d{4})`, 'i');
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const entries = eventPages.map((p) => {
       const head = p.text.split('\n').slice(0, 6).join(' ');
-      const date = (head.match(DATE_RE) || [])[0] || '';
-      return `- ${p.title}${date ? ` — ${date}` : ''} (details: ${p.url})`;
+      const m = head.match(DATE_RE);
+      let start = null, end = null;
+      if (m) {
+        const month = MONTHS.findIndex((x) => x.toLowerCase() === m[3].toLowerCase());
+        start = new Date(Number(m[4]), month, Number(m[1]));
+        end = new Date(Number(m[4]), month, Number(m[2] || m[1]));
+      }
+      return { p, date: m ? m[0] : '', start, end };
     });
+    // Only today-or-future events belong on the "upcoming" calendar — pages for
+    // events that already happened stay in the corpus but are not advertised.
+    const upcoming = entries
+      .filter((e) => !e.end || e.end >= today)
+      .sort((a, b) => (a.start?.getTime() ?? Infinity) - (b.start?.getTime() ?? Infinity));
+    const past = entries.length - upcoming.length;
+    const lines = upcoming.map((e) =>
+      `- ${e.p.title}${e.date ? ` — ${e.date}` : ''} (details: ${e.p.url})`);
     byUrl.set('https://www.cii.in/Events.aspx', {
       url: 'https://www.cii.in/Events.aspx',
       title: 'Upcoming CII Events — Forthcoming Conferences, Summits, Trainings',
       type: 'EVENT',
-      description: `Calendar of ${eventPages.length} upcoming CII events with dates and registration links.`,
-      text: `Upcoming CII events (forthcoming events calendar — what's coming up in the next months):\n${lines.join('\n')}`,
+      description: `Calendar of ${upcoming.length} upcoming CII events with dates and registration links.`,
+      text: `Upcoming CII events (forthcoming events calendar — what's coming up in the next months), in date order:\n${lines.join('\n')}`,
     });
-    console.log(`Synthesized upcoming-events calendar from ${eventPages.length} event pages`);
+    console.log(`Synthesized upcoming-events calendar: ${upcoming.length} upcoming, ${past} past events excluded`);
   }
 
   // Leadership queries must always surface ALL office bearers, so aggregate
@@ -181,31 +225,64 @@ async function main() {
   };
 
   let embedded = false;
-  if (!NO_EMBED && process.env.OPENAI_API_KEY) {
-    console.log(`Embedding ${chunks.length} chunks with ${EMBED_MODEL} (${EMBED_DIMS} dims)...`);
-    const vectors = [];
-    const BATCH = 96;
-    for (let i = 0; i < chunks.length; i += BATCH) {
-      const batch = chunks.slice(i, i + BATCH).map((c) => c.t.slice(0, 4000));
-      let tries = 0;
-      for (;;) {
-        try {
-          vectors.push(...await embedBatch(batch, process.env.OPENAI_API_KEY));
-          break;
-        } catch (e) {
-          if (++tries >= 4) throw e;
-          console.warn(`  retry ${tries}: ${e.message.slice(0, 120)}`);
-          await new Promise((r) => setTimeout(r, 1500 * tries));
-        }
+  if (!NO_EMBED) {
+    const rec = 4 + EMBED_DIMS;
+    const prev = loadPrevRecords(OUT_DIR);
+    const records = new Array(chunks.length).fill(null);
+    let reused = 0;
+    if (prev) {
+      for (let i = 0; i < chunks.length; i++) {
+        const r = prev.get(chunks[i].t);
+        if (r) { records[i] = r; reused++; }
       }
-      process.stdout.write(`  ${Math.min(i + BATCH, chunks.length)}/${chunks.length}\r`);
     }
-    fs.writeFileSync(path.join(OUT_DIR, 'vectors.bin'), quantize(vectors, EMBED_DIMS));
-    index.embeddings = { model: EMBED_MODEL, dims: EMBED_DIMS, count: vectors.length, file: 'vectors.bin' };
-    embedded = true;
-    console.log(`\nWrote ${OUT_DIR}/vectors.bin (${(fs.statSync(path.join(OUT_DIR, 'vectors.bin')).size / 1024).toFixed(0)} KB)`);
-  } else if (!NO_EMBED) {
-    console.warn('OPENAI_API_KEY not set — skipping embeddings (BM25-only index).');
+    const missing = [];
+    for (let i = 0; i < chunks.length; i++) if (!records[i]) missing.push(i);
+    console.log(`Embeddings: ${reused} reused from previous index, ${missing.length} to embed with ${EMBED_MODEL} (${EMBED_DIMS} dims)`);
+    if (missing.length && process.env.OPENAI_API_KEY) {
+      const BATCH = 96;
+      outer: for (let i = 0; i < missing.length; i += BATCH) {
+        const idxs = missing.slice(i, i + BATCH);
+        const batch = idxs.map((j) => chunks[j].t.slice(0, 4000));
+        let tries = 0;
+        for (;;) {
+          try {
+            const vecs = await embedBatch(batch, process.env.OPENAI_API_KEY);
+            idxs.forEach((j, k) => { records[j] = quantizeOne(vecs[k], EMBED_DIMS); });
+            break;
+          } catch (e) {
+            // An auth failure will not fix itself — stop and zero-fill instead.
+            if (/OpenAI embeddings 401/.test(e.message) || ++tries >= 4) {
+              console.warn(`\n  embedding stopped: ${e.message.slice(0, 160)}`);
+              break outer;
+            }
+            console.warn(`  retry ${tries}: ${e.message.slice(0, 120)}`);
+            await new Promise((r) => setTimeout(r, 1500 * tries));
+          }
+        }
+        process.stdout.write(`  ${Math.min(i + BATCH, missing.length)}/${missing.length}\r`);
+      }
+    } else if (missing.length) {
+      console.warn('OPENAI_API_KEY not set — new chunks get zero vectors (BM25 still covers them).');
+    }
+    let zeroed = 0;
+    for (let i = 0; i < chunks.length; i++) {
+      if (!records[i]) { records[i] = Buffer.alloc(rec); zeroed++; }
+    }
+    if (zeroed < chunks.length) {
+      if (zeroed) {
+        console.warn(`!! ${zeroed} chunk(s) carry zero vectors (BM25 still matches them). Re-run build-index with a valid OPENAI_API_KEY to embed them.`);
+      }
+      const head = Buffer.alloc(8);
+      head.writeUInt32LE(chunks.length, 0);
+      head.writeUInt32LE(EMBED_DIMS, 4);
+      fs.writeFileSync(path.join(OUT_DIR, 'vectors.bin'), Buffer.concat([head, ...records]));
+      index.embeddings = { model: EMBED_MODEL, dims: EMBED_DIMS, count: chunks.length, file: 'vectors.bin' };
+      embedded = true;
+      console.log(`\nWrote ${OUT_DIR}/vectors.bin (${(fs.statSync(path.join(OUT_DIR, 'vectors.bin')).size / 1024).toFixed(0)} KB)`);
+    } else {
+      console.warn('No embeddings available at all — writing a BM25-only index.');
+    }
   }
 
   fs.writeFileSync(path.join(OUT_DIR, 'index.json'), JSON.stringify(index));
