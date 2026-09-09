@@ -175,7 +175,9 @@ async function main() {
   // Leadership queries must always surface ALL office bearers, so aggregate
   // every CII_Leadership page (President, President Designate, Vice
   // President, Director General) into one retrievable profile page.
-  const leaderPages = [...byUrl.values()].filter((p) => /CII_Leadership\.aspx/i.test(p.url));
+  // The office-bearer profiles live at CII_Leadership.aspx?ledid=N, except the
+  // Director General's which the site serves at CIILeadership.aspx (no underscore).
+  const leaderPages = [...byUrl.values()].filter((p) => /CII_?Leadership\.aspx/i.test(p.url));
   if (leaderPages.length >= 2) {
     // Explicit "current office bearer" statements so presidency questions
     // beat stale mentions of past presidents scattered across older pages.
@@ -183,7 +185,14 @@ async function main() {
       .filter((p) => /President|Vice President|Director General/i.test(p.title))
       .map((p) => {
         const role = p.title.replace(/^CII\s+/i, '');
-        const name = (p.text.split('\n').find((l) => /^(Mr|Ms|Mrs|Dr|Shri|Smt)\b/.test(l.trim())) || '').trim();
+        const lines = p.text.split('\n').map((l) => l.trim());
+        let name = lines.find((l) => /^(Mr|Ms|Mrs|Dr|Shri|Smt)\b/.test(l)) || '';
+        // Some profile pages omit the honorific — fall back to the name line
+        // directly above the "Role, CII" line.
+        if (!name) {
+          const i = lines.findIndex((l) => /^(President|President Designate|Vice President|Director General)\b.*CII/i.test(l));
+          if (i > 0) name = lines[i - 1];
+        }
         return name ? `The current ${role} of CII is ${name}.` : '';
       })
       .filter(Boolean);
