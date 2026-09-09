@@ -255,7 +255,8 @@ const voiceQ = await page.locator('.acii-input').inputValue();
 ok('EN transcript filled input', /member|cii/i.test(voiceQ), voiceQ.slice(0, 70));
 const voiceSummary = await page.locator('.acii-summary').innerText();
 ok('EN voice answer rendered', voiceSummary.length > 30, voiceSummary.slice(0, 70));
-await page.waitForTimeout(4000); // allow auto TTS fetch
+// Speech synthesis takes a few seconds on a deployed instance — poll.
+for (let w = 0; w < 50 && ttsStatus === null; w++) await page.waitForTimeout(500);
 ok('EN spoken reply fetched (TTS)', ttsStatus === 200, `tts HTTP ${ttsStatus}`);
 const hasAudioOut = await page.evaluate(async () =>
   (await navigator.mediaDevices.enumerateDevices()).some((d) => d.kind === 'audiooutput'));
@@ -287,7 +288,8 @@ const hiVoice = await page.locator('.acii-summary').innerText();
 ok('HI voice answer in Devanagari', /[ऀ-ॿ]/.test(hiVoice), hiVoice.slice(0, 60));
 const hiVoiceEn = await page.locator('.acii-entext').innerText().catch(() => '');
 ok('HI voice answer shows English version', hiVoiceEn.length > 30, hiVoiceEn.slice(0, 60));
-await page.waitForTimeout(4000); // allow auto TTS fetch
+// Speech synthesis takes a few seconds on a deployed instance — poll.
+for (let w = 0; w < 50 && ttsStatus === null; w++) await page.waitForTimeout(500);
 ok('HI spoken reply fetched (TTS)', ttsStatus === 200, `tts HTTP ${ttsStatus}`);
 await page.waitForTimeout(600);
 await page.screenshot({ path: `${SCRATCH}/e2e-voice-answer-hi.png` });
